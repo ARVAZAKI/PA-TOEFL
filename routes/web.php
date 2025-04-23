@@ -3,15 +3,22 @@
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
+use App\Http\Controllers\TestUnitController;
+
 Route::get('/', function () {
     return Inertia::render('welcome');
 })->name('home');
+
 Route::get('/test', function () {
     return Inertia::render('test-unit');
 })->name('test');
+
+Route::post('/submit-test', [TestUnitController::class, 'submitTest'])->name('submit-test');
+
 Route::get('/question', function () {
     return Inertia::render('test-question');
 })->name('question');
+
 Route::get('/scoreboard', function () {
     return Inertia::render('scoreboard');
 })->name('scoreboard');
