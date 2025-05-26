@@ -13,9 +13,8 @@ Route::get('/test/{section?}', [TestUnitController::class, 'subtestShow'])->name
 
 Route::post('/submit-test', [TestUnitController::class, 'submitTest'])->name('submit-test');
 
-Route::get('/scoreboard', function () {
-    return Inertia::render('scoreboard');
-})->name('scoreboard');
+Route::get('/scoreboard', [TestUnitController::class, 'scoreboard'])->name('scoreboard');
+;
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', function () {

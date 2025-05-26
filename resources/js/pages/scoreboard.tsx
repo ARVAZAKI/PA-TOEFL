@@ -4,6 +4,9 @@ import { Head, usePage } from '@inertiajs/react';
 
 export default function Scoreboard() {
     const { auth } = usePage<SharedData>().props;
+    const { props } = usePage();
+    const readingScore = props.readingScore;
+    console.log(readingScore);
 
     return (
         <>
@@ -28,7 +31,7 @@ export default function Scoreboard() {
                             </div>
                             <div className="space-y-1">
                                 <div>
-                                    <span className="font-medium">Reading:</span>
+                                    <span className="font-medium">Reading: {readingScore}</span>
                                 </div>
                                 <div>
                                     <span className="font-medium">Listening:</span>

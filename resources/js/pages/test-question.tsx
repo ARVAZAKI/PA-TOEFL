@@ -38,9 +38,7 @@ export default function TestQuestion() {
     const handleComplete = () => {
         if (currentPage?.nextId === 'scoreboard') {
             router.visit('/scoreboard');
-            // window.location.href = '/test/scoreboard';
         } else if (currentPage?.nextId) {
-            // window.location.href = `/test/${currentPage?.nextId}`;
             router.visit(`/test/${currentPage?.nextId}`);
         }
     };
@@ -68,17 +66,16 @@ export default function TestQuestion() {
                 <link rel="preconnect" href="https://fonts.bunny.net" />
                 <link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600" rel="stylesheet" />
             </Head>
-            {/* {currentQuestion} */}
-            <div className="flex h-screen w-full">
+            {/* {SECTION WRAPPER} */}
+            <div className="flex h-screen w-full bg-[#F2F2F2]">
+                {/* {SECTION WRAPPER} */}
                 <div className="fixed top-0 flex h-16 w-full items-center justify-center bg-white">
                     <div className="w-[100px] rounded bg-blue-600 px-3 py-1 text-sm font-medium text-white">Sisa {formatTime(timeLeft)}</div>
                 </div>
 
-                <div className="flex w-full flex-col items-center justify-center gap-2 bg-[#F2F2F2]">
-                    <div className="flex w-3/4 flex-col items-center justify-center gap-2">
-                        <div className="flex items-start justify-between gap-8">
-                            <Component onComplete={handleComplete} />
-                        </div>
+                <div className="mt-[70px] flex w-full items-start justify-center bg-[#F2F2F2] p-4">
+                    <div className="flex h-full w-full items-start justify-center overflow-hidden">
+                        <Component onComplete={handleComplete} />
                     </div>
                 </div>
             </div>

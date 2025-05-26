@@ -23,9 +23,22 @@ class TestUnitController extends Controller
 
     public function submitTest(Request $request)
     {
-        return $request;
-        // return response()->json(['success' => true]);
+        $readingScore = $request->input('score');
 
-        // return redirect()->route('scoreboard');
+        session(['ReadingScore' => $readingScore]);
+
+        return $request;
+
+        // Kirim response agar Inertia tidak error
+        // return response()->json(['success' => true]);
+    }
+
+    public function scoreboard()
+    {
+        $score = session('ReadingScore', 0); // default 0 jika belum ada
+
+        return Inertia::render('scoreboard', [
+            'readingScore' => $score,
+        ]);
     }
 }
