@@ -9,7 +9,7 @@ const sections = [
         content: [
             'In the <strong>Reading</strong> section, you will answer questions about reading passages. In this practice test, you will be able to review the correct answer for each question by reviewing the answer key at the end of the section.',
             'In the <strong>Listening</strong> section, you will answer questions about conversations and lectures. In this practice test, you will be able to review the correct answer for each question by reviewing the answer key at the end of the section.',
-            'In the <strong>Speaking</strong> section, you will be presented with four questions. The first question is about a familiar topic. The other questions ask you to speak about reading passages, conversations, and lectures. In this practice test, your responses will not be scored. Instead, you will see sample responses to each question.',
+            'In the <strong>Speaking</strong> section, you will be presented with four questions. The u question is about a familiar topic. The other questions ask you to speak about reading passages, conversations, and lectures. In this practice test, your responses will not be scored. Instead, you will see sample responses to each question.',
             'In the <strong>Writing</strong> section, you will be presented with two writing tasks. The first task asks you to write about a reading passage and a lecture. The second task asks you to write a post for an academic discussion. In this practice test, your responses will not be scored. Instead, you will see sample responses to each question.',
         ],
         nextId: 'reading',
@@ -54,6 +54,8 @@ const sections = [
 
 export default function TestInfoPage() {
     const { section } = usePage().props as { section?: string };
+
+    const { username } = usePage().props;
 
     const sectionId = section ?? 'general';
 

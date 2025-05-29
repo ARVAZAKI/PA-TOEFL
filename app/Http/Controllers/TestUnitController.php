@@ -6,18 +6,31 @@ use Illuminate\Http\Request;
 
 class TestUnitController extends Controller
 {
+    public function ThrowSession (Request $request) {
+    $username = $request->input('username');
+    session(['username' => $username]);
+
+    // Bisa redirect saja
+    return redirect()->route('test.show', ['section' => 'general']);
+    }
+    
+    
     public function subtestShow($section = 'general')
     {
+
+        $username = session('username');
         // render halaman test (test-question.tsx)
         if (str_ends_with($section, '-question')) {
             return Inertia::render('test-question', [
                 'section' => $section,
+                'username' => $username,
             ]);
         }
 
         // render halaman info (test-unit.tsx)
         return Inertia::render('test-unit', [
             'section' => $section,
+            'username' => $username,
         ]);
     }
 
@@ -36,9 +49,11 @@ class TestUnitController extends Controller
     public function scoreboard()
     {
         $score = session('ReadingScore', 0); // default 0 jika belum ada
+        $username = session('username');
 
         return Inertia::render('scoreboard', [
             'readingScore' => $score,
+            'username' => $username
         ]);
     }
 }

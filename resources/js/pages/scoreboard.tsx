@@ -5,8 +5,10 @@ import { Head, usePage } from '@inertiajs/react';
 export default function Scoreboard() {
     const { auth } = usePage<SharedData>().props;
     const { props } = usePage();
+    const { username } = usePage().props;
     const readingScore = props.readingScore;
     console.log(readingScore);
+    console.log(username);
 
     return (
         <>
@@ -19,6 +21,7 @@ export default function Scoreboard() {
                     <Card className="w-full max-w-md">
                         <CardHeader>
                             <CardTitle>Test Result</CardTitle>
+                            <CardTitle>Up name: {username}</CardTitle>
                             <CardDescription>Here is your TOEFL Practice Test score.</CardDescription>
                         </CardHeader>
 
