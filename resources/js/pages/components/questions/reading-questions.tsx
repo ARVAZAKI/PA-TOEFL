@@ -124,9 +124,6 @@ export default function ReadingQuestion({ onComplete }: Props) {
         console.log('Correct count:', score);
 
         const countScore = (score / flatQuestions.length) * 30;
-        console.log(score);
-        console.log(flatQuestions.length);
-        console.log(countScore);
 
         // Kirim seluruh data form + score ke server
         setData('score', countScore);

@@ -6,9 +6,8 @@ export default function Scoreboard() {
     const { auth } = usePage<SharedData>().props;
     const { props } = usePage();
     const { username } = usePage().props;
-    const readingScore = props.readingScore;
-    console.log(readingScore);
-    console.log(username);
+    const readingScore = props.readingScore || 0;
+    const totalScore = readingScore;
 
     return (
         <>
@@ -20,30 +19,29 @@ export default function Scoreboard() {
                 <div className="flex h-screen w-full flex-col items-center justify-center gap-2 bg-gray-200">
                     <Card className="w-full max-w-md">
                         <CardHeader>
-                            <CardTitle>Test Result</CardTitle>
-                            <CardTitle>Up name: {username}</CardTitle>
-                            <CardDescription>Here is your TOEFL Practice Test score.</CardDescription>
+                            <CardTitle className="place-self-center">Test Result</CardTitle>
+                            <CardDescription className="place-self-center">Here is your TOEFL Practice Test score.</CardDescription>
                         </CardHeader>
 
                         <CardContent className="space-y-4">
                             <div>
-                                <span className="font-medium">Name:</span>
+                                <span className="font-medium">Name : {username}</span>
                             </div>
                             <div>
-                                <span className="font-medium">Overall Score:</span>
+                                <span className="font-medium">Overall Score: {totalScore}</span>
                             </div>
                             <div className="space-y-1">
                                 <div>
-                                    <span className="font-medium">Reading: {readingScore}</span>
+                                    <span className="font-medium">Reading : {readingScore}</span>
                                 </div>
                                 <div>
-                                    <span className="font-medium">Listening:</span>
+                                    <span className="font-medium">Listening :</span>
                                 </div>
                                 <div>
-                                    <span className="font-medium">Speaking:</span>
+                                    <span className="font-medium">Speaking :</span>
                                 </div>
                                 <div>
-                                    <span className="font-medium">Writing:</span>
+                                    <span className="font-medium">Writing :</span>
                                 </div>
                             </div>
                         </CardContent>

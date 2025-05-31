@@ -6,15 +6,16 @@ use Illuminate\Http\Request;
 
 class TestUnitController extends Controller
 {
-    public function ThrowSession (Request $request) {
-    $username = $request->input('username');
-    session(['username' => $username]);
+    public function ThrowSession(Request $request)
+    {
+        $username = $request->input('username');
+        session(['username' => $username]);
 
-    // Bisa redirect saja
-    return redirect()->route('test.show', ['section' => 'general']);
+        // Bisa redirect saja
+        return redirect()->route('test.show', ['section' => 'general']);
     }
-    
-    
+
+
     public function subtestShow($section = 'general')
     {
 
