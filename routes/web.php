@@ -12,6 +12,8 @@ Route::get('/test/{section?}', [TestUnitController::class, 'subtestShow'])->name
 
 
 Route::post('/submit-test', [TestUnitController::class, 'submitTest'])->name('submit-test');
+// Route::post('/submit-submitReadings', [TestUnitController::class, 'submitReadings'])->name('submit-submitReadings');
+
 
 Route::post('/submit-session', [TestUnitController::class, 'ThrowSession'])->name('ThrowSession');
 

@@ -2,10 +2,7 @@ import { Button } from '@/components/ui/button';
 import { useForm } from '@inertiajs/react';
 import NavigatorBox from '../layouts/navigator-question';
 import SpeakingRecorder from '../utils/speaking-recorder';
-
-type Props = {
-    onComplete: () => void;
-};
+import { Props } from '@/types';
 
 const speakings = [
     {
@@ -53,13 +50,14 @@ const speakings = [
     },
 ];
 
-export default function SpeakingQuestion({ onComplete }: Props) {
+export default function SpeakingQuestion({ onComplete, section }: Props) {
     const { data, setData, post } = useForm({
         answers: {} as Record<number, string>,
         recordings: {} as Record<number, Blob>,
         currentIndex: 0,
         currentQuestionIndex: 1,
         score: 0,
+        section: section,
     });
 
     const currentReading = speakings[data.currentIndex];

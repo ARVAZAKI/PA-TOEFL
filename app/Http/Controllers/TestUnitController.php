@@ -37,23 +37,49 @@ class TestUnitController extends Controller
 
     public function submitTest(Request $request)
     {
-        $readingScore = $request->input('score');
+        // $readingScore = $request->input('score');
+        $section = $request->input('section');
+        $score = $request->input('score'); // jawaban user
 
-        session(['ReadingScore' => $readingScore]);
+        switch($section) {
+            case "reading-question" :
+                session(['ReadingScore' => $score]);
+                return $request;
+                break;
+            case "listening-question" :
+                session(['ListeningScore' => $score]);
+                return $request;
+                break;
+            case "speaking-question" :
+                session(['SpeakingScore' => $score]);
+                return $request;
+                break;
+            case "writing-question" :
+                session(['WritingScore' => $score]);
+                return $request;
+                break;
+            
+        }
 
-        return $request;
+
 
         // Kirim response agar Inertia tidak error
         // return response()->json(['success' => true]);
     }
 
+    
+
     public function scoreboard()
     {
-        $score = session('ReadingScore', 0); // default 0 jika belum ada
+        $readingScore = session('ReadingScore', 0); // default 0 jika belum ada
+        $listeningScore = session('ListeningScore', 0); // default 0 jika belum ada
+        $readingScore = session('ReadingScore', 0); // default 0 jika belum ada
+        $readingScore = session('ReadingScore', 0); // default 0 jika belum ada
         $username = session('username');
 
         return Inertia::render('scoreboard', [
-            'readingScore' => $score,
+            'readingScore' => $readingScore,
+            'listeningScore' => $listeningScore,
             'username' => $username
         ]);
     }

@@ -75,7 +75,7 @@ export default function TestQuestion() {
 
                 <div className="mt-[70px] flex w-full items-start justify-center bg-[#F2F2F2] p-4">
                     <div className="flex h-full w-full items-start justify-center overflow-hidden">
-                        <Component onComplete={handleComplete} />
+                        <Component onComplete={handleComplete} section={currentPage?.id} />
                     </div>
                 </div>
             </div>

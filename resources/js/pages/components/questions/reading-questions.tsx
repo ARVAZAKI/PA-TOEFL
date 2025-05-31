@@ -2,10 +2,7 @@ import { Button } from '@/components/ui/button';
 import { useForm } from '@inertiajs/react';
 import { useEffect } from 'react';
 import NavigatorBox from '../layouts/navigator-question';
-
-type Props = {
-    onComplete: () => void;
-};
+import { Props } from '@/types';
 
 const readings = [
     {
@@ -58,17 +55,19 @@ const readings = [
     },
 ];
 
-export default function ReadingQuestion({ onComplete }: Props) {
+export default function ReadingQuestion({ onComplete, section }: Props) {
     const { data, setData, post } = useForm({
         answers: {} as Record<number, string>,
         currentIndex: 0,
         currentQuestionIndex: 1,
         score: 0,
+        section: section,
     });
 
     const currentReading = readings[data.currentIndex];
     const questions = currentReading.questions;
     const currentQuestion = questions[data.currentQuestionIndex - 1];
+    // this is for throwing section
 
     // const handleSelectAnswer = (choice: string) => {
     //     setData('answers', { ...data.answers, [currentQuestion.id]: choice });
@@ -127,6 +126,7 @@ export default function ReadingQuestion({ onComplete }: Props) {
 
         // Kirim seluruh data form + score ke server
         setData('score', countScore);
+
         // post('/submit-test', {
         //     onStart: () => console.log('start'),
         //     onError: (errors) => console.log('error:', errors),
@@ -136,10 +136,12 @@ export default function ReadingQuestion({ onComplete }: Props) {
         //     },
         // });
     };
+    // console.log(data.section);
 
     useEffect(() => {
         if (data.score !== 0) {
             post('/submit-test', data);
+
             onComplete(); // Ensuring it's called only after score updates
         }
     }, [data.score]);
@@ -169,49 +171,60 @@ export default function ReadingQuestion({ onComplete }: Props) {
 
             {/* QUESTIONS & Answers box*/}
 
-            <div className="max-h-[85vh] w-1/3 flex-1 space-y-4 overflow-auto rounded-sm bg-white p-1 shadow-sm">
-                {questions.map((question, qIdx) => (
-                    <div key={question.id} className="flex flex-col gap-2 border-b-4 border-red-400 p-4">
-                        {/* Questions */}
-                        <p className="text-sm leading-relaxed text-gray-700">
-                            {question.id}. {question.question}
-                        </p>
+            <div className="max-h-[85vh] w-1/3">
+                <div className="max-h-[85vh] flex-1 space-y-4 overflow-auto rounded-t-sm bg-white p-1 shadow-sm">
+                    {questions.map((question, qIdx) => (
+                        <div key={question.id} className="flex flex-col gap-2 border-b-4 border-red-400 p-4">
+                            {/* Questions */}
+                            <p className="text-sm leading-relaxed text-gray-700">
+                                {question.id}. {question.question}
+                            </p>
 
-                        {/* Answer */}
-                        <div className="space-y-2">
-                            {question.choices.map((choice, index) => (
-                                <label
-                                    key={index}
-                                    className={`block cursor-pointer rounded-md border px-4 py-2 ${
-                                        data.answers[question.id] === choice ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-blue-400'
-                                    }`}
-                                >
-                                    <input
-                                        type="radio"
-                                        name={`question-${question.id}`}
-                                        value={choice}
-                                        checked={data.answers[question.id] === choice}
-                                        onChange={() =>
-                                            setData('answers', {
-                                                ...data.answers,
-                                                [question.id]: choice,
-                                            })
-                                        }
-                                        className="mr-2"
-                                    />
-                                    <span className="font-medium">{String.fromCharCode(65 + index)}.</span> {choice}
-                                </label>
-                            ))}
+                            {/* Answer */}
+                            <div className="space-y-2">
+                                {question.choices.map((choice, index) => (
+                                    <label
+                                        key={index}
+                                        className={`block cursor-pointer rounded-md border px-4 py-2 ${
+                                            data.answers[question.id] === choice
+                                                ? 'border-blue-500 bg-blue-50'
+                                                : 'border-gray-300 hover:border-blue-400'
+                                        }`}
+                                    >
+                                        <input
+                                            type="radio"
+                                            name={`question-${question.id}`}
+                                            value={choice}
+                                            checked={data.answers[question.id] === choice}
+                                            onChange={() =>
+                                                setData('answers', {
+                                                    ...data.answers,
+                                                    [question.id]: choice,
+                                                })
+                                            }
+                                            className="mr-2"
+                                        />
+                                        <span className="font-medium">{String.fromCharCode(65 + index)}.</span> {choice}
+                                    </label>
+                                ))}
+                            </div>
                         </div>
+                    ))}
+                </div>
+                <div className="rounded-b-sm bg-white">
+                    <div className="mx-2 mb-2 flex justify-between py-2">
+                        <Button size="sm" onClick={handlePrevReading} disabled={data.currentIndex === 0} className="place-self-center">
+                            Prev Readings
+                        </Button>
+                        <Button
+                            size="sm"
+                            onClick={handleNextReading}
+                            disabled={data.currentIndex === readings.length - 1}
+                            className="place-self-center"
+                        >
+                            Next Readings
+                        </Button>
                     </div>
-                ))}
-                <div className="mx-2 mb-2 flex justify-between">
-                    <Button size="sm" onClick={handlePrevReading} disabled={data.currentIndex === 0} className="place-self-center">
-                        Prev Readings
-                    </Button>
-                    <Button size="sm" onClick={handleNextReading} disabled={data.currentIndex === readings.length - 1} className="place-self-center">
-                        Next Readings
-                    </Button>
                 </div>
             </div>
         </div>

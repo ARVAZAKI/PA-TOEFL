@@ -44,7 +44,7 @@ export default function NavigatorBox({ propsNav }: NavigatorBoxProps) {
     };
 
     return (
-        <div className="w-1/6 space-y-4 rounded-lg border bg-white p-4 shadow-sm">
+        <div className="w-60 space-y-4 rounded-lg border bg-white p-4 shadow-sm">
             <div className="text-sm font-medium">{username}</div>
             <div className="text-xs text-gray-500">{section} Navigator</div>
             <div className="text-xs text-gray-500">

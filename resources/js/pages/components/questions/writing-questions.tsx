@@ -1,10 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { useForm } from '@inertiajs/react';
 import NavigatorBox from '../layouts/navigator-question';
-
-type Props = {
-    onComplete: () => void;
-};
+import { Props } from '@/types';
 
 const writings = [
     {
@@ -30,12 +27,13 @@ const writings = [
     },
 ];
 
-export default function WritingQuestion({ onComplete }: Props) {
+export default function WritingQuestion({ onComplete, section }: Props) {
     const { data, setData, post } = useForm({
         answers: {} as Record<number, string>,
         currentIndex: 0,
         currentQuestionIndex: 1,
         score: 0,
+        section: section,
     });
 
     const currentWriting = writings[data.currentIndex];

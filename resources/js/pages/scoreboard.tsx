@@ -7,7 +7,11 @@ export default function Scoreboard() {
     const { props } = usePage();
     const { username } = usePage().props;
     const readingScore = props.readingScore || 0;
-    const totalScore = readingScore;
+    const listeningScore = props.listeningScore || 0;
+    const totalScore = readingScore + listeningScore;
+
+    // console.log(readingScore);
+    // console.log(listeningScore);
 
     return (
         <>
@@ -35,13 +39,16 @@ export default function Scoreboard() {
                                     <span className="font-medium">Reading : {readingScore}</span>
                                 </div>
                                 <div>
-                                    <span className="font-medium">Listening :</span>
+                                    <span className="font-medium">Listening : {listeningScore}</span>
                                 </div>
                                 <div>
                                     <span className="font-medium">Speaking :</span>
                                 </div>
                                 <div>
                                     <span className="font-medium">Writing :</span>
+                                </div>
+                                <div>
+                                    <span className="font-bold">Total score : {totalScore}</span>
                                 </div>
                             </div>
                         </CardContent>

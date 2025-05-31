@@ -25,14 +25,14 @@ export default function Welcome() {
                     {/* <input type="text" name="username" id="username" placeholder="Masukkan username...." className="form-control" /> */}
                     <h1 className="text-2xl font-medium">Welcome To Test TOEFL</h1>
                     <form className="my-6 grid gap-2 p-4" onSubmit={handleSubmit}>
-                        <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-black">username</label>
+                        <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-black">Name</label>
                         <input
                             type="text"
                             name="username"
                             id="username"
                             value={data.username}
                             onChange={(e) => setData('username', e.target.value)}
-                            placeholder="Input username . . . "
+                            placeholder="Input Name . . . "
                             className="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:border-blue-500 dark:focus:ring-blue-500"
                         />
                         <Button variant="default" size="default">
