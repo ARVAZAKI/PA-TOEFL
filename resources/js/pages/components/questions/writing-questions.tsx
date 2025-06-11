@@ -1,7 +1,8 @@
 import { Button } from '@/components/ui/button';
-import { useForm } from '@inertiajs/react';
-import NavigatorBox from '../layouts/navigator-question';
 import { Props } from '@/types';
+import { useForm } from '@inertiajs/react';
+import { useEffect } from 'react';
+import NavigatorBox from '../layouts/navigator-question';
 
 const writings = [
     {
@@ -20,10 +21,7 @@ const writings = [
                     undesirable small species. Even larger mesh sizes do not prevent bycatch because once the net begins to fill with fish or shrimp,
                     small individuals caught subsequently are trapped without ever encountering the mesh. In any case, these incidental captures are
                     unmarketable and are usually shoveled back over the side of the vessel dead or dying.`,
-        questions: [
-            { id: 1, question: 'Tono membaca artikel dan menyimpulkan...', correctAnswer: 'saya sedang memasak' },
-            { id: 2, question: 'Apa tujuan utama artikel?', correctAnswer: 'untuk memberitahukan bahwa bumi itu lonjong' },
-        ],
+        questions: [{ id: 1, question: 'Tono membaca artikel dan menyimpulkan...' }],
     },
 ];
 
@@ -46,10 +44,17 @@ export default function WritingQuestion({ onComplete, section }: Props) {
     };
 
     const handleAnswerChange = (questionId: number, value: string) => {
-        setData('answers', {
-            ...data.answers,
-            [questionId]: value,
-        });
+        if (value) {
+            setData('answers', {
+                ...data.answers,
+                [questionId]: value,
+            });
+        } else {
+            // Hapus key jika kosong
+            const newAnswers = { ...data.answers };
+            delete newAnswers[questionId];
+            setData('answers', newAnswers);
+        }
     };
 
     const handleNextReading = () => {
@@ -74,33 +79,51 @@ export default function WritingQuestion({ onComplete, section }: Props) {
         }
     };
 
-    const handleSubmit = () => {
-        let score = 0; // Start with 0 correct answers
-        let answeredCount = Object.keys(data.answers).length;
+    const handleSubmit = async () => {
+        if (Object.values(data.answers).length < questions.length) {
+            alert("Test isn't Finish !!!");
+        }
+        let totalScore = 0;
 
-        writings.forEach((writing) =>
-            writing.questions.forEach((q) => {
-                const userAnswer = data.answers[q.id];
-                const correctAnswer = q.correctAnswer;
+        for (const writing of writings) {
+            for (const q of writing.questions) {
+                const answer = data.answers[q.id];
+                if (!answer) continue; // Lewatkan jika belum dijawab
 
-                console.log(userAnswer);
-                console.log(correctAnswer);
+                const payload = {
+                    question: q.question,
+                    answer: answer,
+                };
 
-                if (userAnswer?.trim().toLowerCase() === correctAnswer.trim().toLowerCase()) {
-                    score++;
+                try {
+                    const response = await fetch('http://127.0.0.1:5000/assess-writing', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(payload),
+                    });
+
+                    const result = await response.json();
+
+                    if (response.ok) {
+                        const score = Number(result.assessment.score || 0);
+                        totalScore += score;
+                        console.log(`Score for question ${q.id}:`, score);
+                    } else {
+                        console.warn(`Skipping question ${q.id}:`, result.error);
+                    }
+                } catch (error) {
+                    console.error(`Error processing question ${q.id}:`, error);
                 }
-            }),
-        );
+            }
+        }
 
-        console.log(score);
-        // Update the correctCount in the form data
-
-        setData('score', score);
+        setData('score', totalScore);
         // Submit the data
         // post('/submit-test', {
         //     // correctCount,
         //     onStart: () => console.log('start'),
-
         //     onError: (errors) => {
         //         console.log('error:', errors);
         //     },
@@ -112,6 +135,13 @@ export default function WritingQuestion({ onComplete, section }: Props) {
         //     },
         // });
     };
+
+    useEffect(() => {
+        if (data.score !== 0) {
+            post('/submit-test', data);
+            onComplete(); // Ensuring it's called only after score updates
+        }
+    }, [data.score]);
 
     const propsNavigator = {
         props: data,
@@ -127,7 +157,8 @@ export default function WritingQuestion({ onComplete, section }: Props) {
             <NavigatorBox propsNav={propsNavigator} />
 
             {/* Reading BOX */}
-            <div className="max-h-[85vh] w-1/3 flex-1 space-y-4 overflow-auto rounded-sm bg-white p-4 shadow-sm">
+            <div className="max-h-[85vh] w-1/25 flex-1 space-y-4 overflow-auto rounded-sm bg-white p-4 shadow-sm">
+                <p>Hint : Min 400 word </p>
                 <div className="flex items-center justify-between">
                     <h2 className="text-xl font-semibold">{currentWriting.title}</h2>
                 </div>
@@ -136,39 +167,47 @@ export default function WritingQuestion({ onComplete, section }: Props) {
             </div>
 
             {/* Question & Answer Box */}
-            <div className="max-h-[85vh] w-1/3 flex-1 space-y-4 overflow-auto rounded-sm bg-white p-1 shadow-sm">
-                {questions.map((question, qidx) => (
-                    <div key={question.id} className="flex flex-col gap-2 border-b-4 border-red-400 p-4">
-                        {/* Question */}
-                        <p className="text-sm leading-relaxed text-gray-700">
-                            {question.id}. {question.question}
-                        </p>
+            <div className="max-h-[100vh] w-1/3">
+                <div className="max-h-[80vh] flex-1 space-y-4 overflow-auto rounded-t-sm bg-white p-1 shadow-sm">
+                    {questions.map((question, qidx) => (
+                        <div key={question.id} className="flex flex-col gap-2 p-4">
+                            {/* Question */}
+                            <p className="text-sm leading-relaxed text-gray-700">
+                                {question.id}. {question.question}
+                            </p>
 
-                        {/* Answer */}
-                        <div className="space-y-2">
-                            <label htmlFor="answer" className="mb-1 block font-medium">
-                                Your Answer
-                            </label>
-                            <textarea
-                                id="answer"
-                                key={`question-${question.id}`}
-                                name={`question-${question.id}`}
-                                className="min-h-[200px] w-full resize-none rounded border p-3"
-                                placeholder="Type your answer here . . . ."
-                                value={data.answers[question.id] || ''}
-                                onChange={(e) => handleAnswerChange(question.id, e.target.value)}
-                            />
+                            {/* Answer */}
+                            <div className="space-y-2">
+                                <label htmlFor="answer" className="mb-1 block font-medium">
+                                    Your Answer
+                                </label>
+                                <textarea
+                                    id="answer"
+                                    key={`question-${question.id}`}
+                                    name={`question-${question.id}`}
+                                    className="min-h-[200px] w-full resize-none rounded border p-3"
+                                    placeholder="Type your answer here . . . ."
+                                    value={data.answers[question.id] || ''}
+                                    onChange={(e) => handleAnswerChange(question.id, e.target.value)}
+                                />
+                            </div>
                         </div>
+                    ))}
+                </div>
+                <div className="rounded-b-sm bg-white shadow-sm">
+                    <div className="mx-2 mb-2 flex justify-between py-2">
+                        <Button size="sm" onClick={handlePrevReading} disabled={data.currentIndex === 0} className="place-self-center">
+                            Prev Readings
+                        </Button>
+                        <Button
+                            size="sm"
+                            onClick={handleNextReading}
+                            disabled={data.currentIndex === writings.length - 1}
+                            className="place-self-center"
+                        >
+                            Next Readings
+                        </Button>
                     </div>
-                ))}
-
-                <div className="mx-2 mb-2 flex justify-between">
-                    <Button size="sm" onClick={handlePrevReading} disabled={data.currentIndex === 0} className="place-self-center">
-                        Prev Readings
-                    </Button>
-                    <Button size="sm" onClick={handleNextReading} disabled={data.currentIndex === writings.length - 1} className="place-self-center">
-                        Next Readings
-                    </Button>
                 </div>
             </div>
         </div>

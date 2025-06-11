@@ -5,10 +5,12 @@ import { Head, usePage } from '@inertiajs/react';
 export default function Scoreboard() {
     const { auth } = usePage<SharedData>().props;
     const { props } = usePage();
-    const { username } = usePage().props;
-    const readingScore = props.readingScore || 0;
-    const listeningScore = props.listeningScore || 0;
-    const totalScore = readingScore + listeningScore;
+    const { username } = usePage().props as { username?: string };
+    const readingScore = Number(props.readingScore) || 0;
+    const listeningScore = Number(props.listeningScore) || 0;
+    const speakingScore = Number(props.speakingScore) || 0;
+    const writingScore = Number(props.writingScore) || 0;
+    const totalScore = readingScore + listeningScore + speakingScore + writingScore;
 
     // console.log(readingScore);
     // console.log(listeningScore);
@@ -42,13 +44,10 @@ export default function Scoreboard() {
                                     <span className="font-medium">Listening : {listeningScore}</span>
                                 </div>
                                 <div>
-                                    <span className="font-medium">Speaking :</span>
+                                    <span className="font-medium">Speaking : {speakingScore}</span>
                                 </div>
                                 <div>
-                                    <span className="font-medium">Writing :</span>
-                                </div>
-                                <div>
-                                    <span className="font-bold">Total score : {totalScore}</span>
+                                    <span className="font-medium">Writing : {writingScore}</span>
                                 </div>
                             </div>
                         </CardContent>

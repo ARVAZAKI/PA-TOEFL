@@ -1,0 +1,3 @@
+[submodule "flask-openai-whisper"]
+	path = flask-openai-whisper
+	url = https://github.com/ARVAZAKI/flask-openai-whisper.git

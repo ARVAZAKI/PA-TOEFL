@@ -41,46 +41,43 @@ class TestUnitController extends Controller
         $section = $request->input('section');
         $score = $request->input('score'); // jawaban user
 
-        switch($section) {
-            case "reading-question" :
+        switch ($section) {
+            case "reading-question":
                 session(['ReadingScore' => $score]);
-                return $request;
                 break;
-            case "listening-question" :
+            case "listening-question":
                 session(['ListeningScore' => $score]);
-                return $request;
                 break;
-            case "speaking-question" :
+            case "speaking-question":
                 session(['SpeakingScore' => $score]);
-                return $request;
                 break;
-            case "writing-question" :
+            case "writing-question":
                 session(['WritingScore' => $score]);
-                return $request;
                 break;
-            
+
         }
-
-
 
         // Kirim response agar Inertia tidak error
         // return response()->json(['success' => true]);
     }
 
-    
+
 
     public function scoreboard()
     {
-        $readingScore = session('ReadingScore', 0); // default 0 jika belum ada
-        $listeningScore = session('ListeningScore', 0); // default 0 jika belum ada
-        $readingScore = session('ReadingScore', 0); // default 0 jika belum ada
-        $readingScore = session('ReadingScore', 0); // default 0 jika belum ada
+        $readingScore = session('ReadingScore', 0);
+        $listeningScore = session('ListeningScore', 0);
+        $speakingScore = session('SpeakingScore', 0);
+        $writingScore = session('WritingScore', 0);
         $username = session('username');
 
         return Inertia::render('scoreboard', [
             'readingScore' => $readingScore,
             'listeningScore' => $listeningScore,
+            'speakingScore' => $speakingScore,
+            'writingScore' => $writingScore,
             'username' => $username
         ]);
     }
+
 }

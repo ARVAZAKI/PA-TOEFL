@@ -1,8 +1,8 @@
 import { Button } from '@/components/ui/button';
+import { Props } from '@/types';
 import { useForm } from '@inertiajs/react';
 import { useEffect } from 'react';
 import NavigatorBox from '../layouts/navigator-question';
-import { Props } from '@/types';
 
 const readings = [
     {
@@ -59,7 +59,7 @@ export default function ReadingQuestion({ onComplete, section }: Props) {
     const { data, setData, post } = useForm({
         answers: {} as Record<number, string>,
         currentIndex: 0,
-        currentQuestionIndex: 1,
+        currentQuestionIndex: 0,
         score: 0,
         section: section,
     });
@@ -171,10 +171,10 @@ export default function ReadingQuestion({ onComplete, section }: Props) {
 
             {/* QUESTIONS & Answers box*/}
 
-            <div className="max-h-[85vh] w-1/3">
-                <div className="max-h-[85vh] flex-1 space-y-4 overflow-auto rounded-t-sm bg-white p-1 shadow-sm">
+            <div className="max-h-[100vh] w-1/3">
+                <div className="max-h-[80vh] flex-1 space-y-4 overflow-auto rounded-t-sm bg-white p-1 shadow-sm">
                     {questions.map((question, qIdx) => (
-                        <div key={question.id} className="flex flex-col gap-2 border-b-4 border-red-400 p-4">
+                        <div key={question.id} className="flex flex-col gap-2 p-4">
                             {/* Questions */}
                             <p className="text-sm leading-relaxed text-gray-700">
                                 {question.id}. {question.question}
@@ -211,7 +211,7 @@ export default function ReadingQuestion({ onComplete, section }: Props) {
                         </div>
                     ))}
                 </div>
-                <div className="rounded-b-sm bg-white">
+                <div className="rounded-b-sm bg-white shadow-sm">
                     <div className="mx-2 mb-2 flex justify-between py-2">
                         <Button size="sm" onClick={handlePrevReading} disabled={data.currentIndex === 0} className="place-self-center">
                             Prev Readings

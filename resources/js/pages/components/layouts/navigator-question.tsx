@@ -1,7 +1,3 @@
-// type Props = {
-//     onComplete: () => void;
-// };
-
 import { usePage } from '@inertiajs/react';
 
 type Tquestionpage = {
@@ -26,7 +22,7 @@ export default function NavigatorBox({ propsNav }: NavigatorBoxProps) {
     const { props, setData, sectionQuestions, handleSubmit } = propsNav;
     const { section } = usePage().props as { section?: string };
 
-    const { username } = usePage().props;
+    const { username } = usePage().props as { username?: string };
 
     const flatQuestions = sectionQuestions.flatMap((reading) =>
         reading.questions.map((question: any) => ({
@@ -36,11 +32,18 @@ export default function NavigatorBox({ propsNav }: NavigatorBoxProps) {
     );
 
     const handleNavigateIndex = (questionIndex: number) => {
+        const isSectionPerQuestion = (section: string | undefined) => section === 'speaking-question' || section === 'writing-question';
         const question = flatQuestions[questionIndex];
-        const readingIndex = sectionQuestions.findIndex((r) => r.id === question.readingId);
 
-        setData('currentIndex', readingIndex); // ubah reading yg ditampilkan
-        setData('currentQuestionIndex', questionIndex); // pindah ke soal yg sesuai
+        if (isSectionPerQuestion(section)) {
+            setData('currentQuestionIndex', questionIndex);
+            console.log(section);
+        } else {
+            // reading/listening
+            const readingIndex = sectionQuestions.findIndex((r) => r.id === question.readingId);
+            setData('currentIndex', readingIndex);
+            setData('currentQuestionIndex', questionIndex);
+        }
     };
 
     return (
