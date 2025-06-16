@@ -20,11 +20,21 @@ class TestUnitController extends Controller
     {
 
         $username = session('username');
+        $readingScore = session('ReadingScore', 0);
+        $listeningScore = session('ListeningScore', 0);
+        $speakingScore = session('SpeakingScore', 0);
+        $writingScore = session('WritingScore', 0);
+        $username = session('username');
+
         // render halaman test (test-question.tsx)
         if (str_ends_with($section, '-question')) {
             return Inertia::render('test-question', [
                 'section' => $section,
                 'username' => $username,
+                'readingScore' => $readingScore,
+                'listeningScore' => $listeningScore,
+                'speakingScore' => $speakingScore,
+                'writingScore' => $writingScore,
             ]);
         }
 
@@ -32,12 +42,15 @@ class TestUnitController extends Controller
         return Inertia::render('test-unit', [
             'section' => $section,
             'username' => $username,
+            'readingScore' => $readingScore,
+            'listeningScore' => $listeningScore,
+            'speakingScore' => $speakingScore,
+            'writingScore' => $writingScore,
         ]);
     }
 
     public function submitTest(Request $request)
     {
-        // $readingScore = $request->input('score');
         $section = $request->input('section');
         $score = $request->input('score'); // jawaban user
 
@@ -56,9 +69,6 @@ class TestUnitController extends Controller
                 break;
 
         }
-
-        // Kirim response agar Inertia tidak error
-        // return response()->json(['success' => true]);
     }
 
 

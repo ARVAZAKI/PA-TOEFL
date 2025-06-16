@@ -1,7 +1,8 @@
 import { Button } from '@/components/ui/button';
 import { Props } from '@/types';
 import { useForm } from '@inertiajs/react';
-import { useEffect } from 'react';
+import { Flag, FlagOff } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import NavigatorBox from '../layouts/navigator-question';
 import SpeakingRecorder from '../utils/speaking-recorder';
 
@@ -85,35 +86,37 @@ export default function SpeakingQuestion({ onComplete, section }: Props) {
         answers: {} as Record<number, string>,
         recordings: {} as Record<number, Blob>,
         scoreRecords: {} as Record<number, number>,
-        // currentIndex: 0,
         currentQuestionIndex: 0,
         score: 0,
         section: section,
     });
 
-    const currentReading = speakings[data.currentQuestionIndex];
-    const questions = currentReading.questions;
+    const [flagged, setFlag] = useState<Record<number, boolean>>({}) || false;
 
-    const handleNextSpeaking = () => {
-        if (data.currentQuestionIndex < speakings.length - 1) {
-            const nextQuestionIndex = data.currentQuestionIndex + 1;
-            const nextSpeaking = speakings[nextQuestionIndex];
+    const flatQuestions = speakings.flatMap((speaking) => speaking.questions.map((q) => ({ ...q, speakingId: speaking.id })));
 
-            console.log('index : ', nextQuestionIndex);
+    const currentQuestion = flatQuestions[data.currentQuestionIndex];
+    const currentReading = speakings.find((r) => r.id === currentQuestion.speakingId)!;
 
-            // setData('currentIndex', nextQuestionIndex);  bisa dihapus jika tidak dipakai lagi
-            setData('currentQuestionIndex', nextQuestionIndex);
+    // const currentReading = speakings[data.currentQuestionIndex];
+    // const questions = currentReading.questions;
+
+    const toggleFlag = (id: number) => {
+        setFlag((prev) => ({ ...prev, [id]: !prev[id] }));
+        console.log(flagged);
+    };
+
+    const handlePrev = () => {
+        if (data.currentQuestionIndex > 0) {
+            setData('currentQuestionIndex', data.currentQuestionIndex - 1);
         }
     };
 
-    const handlePrevSpeaking = () => {
-        if (data.currentQuestionIndex > 0) {
-            const prevQuestionIndex = data.currentQuestionIndex - 1;
-            const prevSpeaking = speakings[prevQuestionIndex];
-            console.log('index : ', prevQuestionIndex);
-
-            // setData('currentIndex', prevQuestionIndex); bisa dihapus jika tidak dipakai lagi
-            setData('currentQuestionIndex', prevQuestionIndex);
+    const handleNext = () => {
+        if (data.currentQuestionIndex < flatQuestions.length - 1) {
+            setData('currentQuestionIndex', data.currentQuestionIndex + 1);
+        } else {
+            handleSubmit();
         }
     };
 
@@ -164,16 +167,6 @@ export default function SpeakingQuestion({ onComplete, section }: Props) {
     const handleSubmit = () => {
         const totalScore = Object.values(data.scoreRecords).reduce((sum, val) => sum + val, 0);
         setData('score', totalScore);
-        // post('/submit-test', {
-        //     onStart: () => console.log('start'),
-        //     onError: (errors) => console.log('error:', errors),
-        //     onFinish: () => {
-        //         console.log('finish');
-        //         setTimeout(() => {
-        //             onComplete();
-        //         }, 5);
-        //     },
-        // });
     };
 
     useEffect(() => {
@@ -189,6 +182,7 @@ export default function SpeakingQuestion({ onComplete, section }: Props) {
         sectionQuestions: speakings,
         onComplete: onComplete,
         handleSubmit: handleSubmit,
+        flagged: flagged,
     };
 
     return (
@@ -204,34 +198,37 @@ export default function SpeakingQuestion({ onComplete, section }: Props) {
                 <p className="text-sm break-words text-gray-700 select-none">{currentReading.passage}</p>
             </div>
 
-            {/* Soal */}
+            {/* Question Box */}
             <div className="max-h-[100vh] w-1/3">
-                <div className="max-h-[80vh] flex-1 space-y-4 overflow-auto rounded-t-sm bg-white p-1 shadow-sm">
-                    {questions.map((question, qidx) => (
-                        <div key={question.id} className="flex-1 space-y-4 rounded-sm bg-white p-4 shadow-sm">
-                            <h2 className="text-xl font-semibold">No. {question.id}</h2>
-                            <p className="text-sm text-gray-700">{question.question}</p>
-
-                            {/* Komponen Perekam */}
-                            <div className="mt-4">
-                                <label className="mb-2 block font-medium">Your Speaking Answer :</label>
-                                <SpeakingRecorder onSave={handleSaveRecording} />
-                            </div>
+                <div className="max-h-[80vh] flex-1 space-y-4 overflow-auto rounded-t-sm bg-white p-4 shadow-sm">
+                    <div key={currentQuestion.id} className="flex flex-col gap-2">
+                        <div className="flex justify-between gap-2">
+                            <p className="text-sm leading-relaxed text-gray-700">
+                                {currentQuestion.id}. {currentQuestion.question}
+                            </p>
+                            <Button variant={'outline'} onClick={() => toggleFlag(currentQuestion.id)}>
+                                {flagged[currentQuestion.id] ? (
+                                    <FlagOff className="h-5 w-5 text-red-600" />
+                                ) : (
+                                    <Flag className="'h-5 w-5 text-red-600" />
+                                )}
+                            </Button>
                         </div>
-                    ))}
+                        {/* Komponen Perekam */}
+                        <div className="mt-4">
+                            <label className="mb-2 block font-medium">Your Speaking Answer :</label>
+                            <SpeakingRecorder onSave={handleSaveRecording} />
+                        </div>
+                    </div>
                 </div>
+
                 <div className="rounded-b-sm bg-white shadow-sm">
                     <div className="mx-2 mb-2 flex justify-between py-2">
-                        <Button size="sm" onClick={handlePrevSpeaking} disabled={data.currentQuestionIndex === 0} className="place-self-center">
-                            Prev Readings
+                        <Button size="sm" onClick={handlePrev} disabled={data.currentQuestionIndex === 0}>
+                            Prev Question
                         </Button>
-                        <Button
-                            size="sm"
-                            onClick={handleNextSpeaking}
-                            disabled={data.currentQuestionIndex === speakings.length - 1}
-                            className="place-self-center"
-                        >
-                            Next Readings
+                        <Button size="sm" onClick={handleNext}>
+                            {data.currentQuestionIndex === flatQuestions.length - 1 ? 'Next Section' : 'Next Question'}
                         </Button>
                     </div>
                 </div>

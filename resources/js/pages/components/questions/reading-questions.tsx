@@ -1,7 +1,8 @@
 import { Button } from '@/components/ui/button';
 import { Props } from '@/types';
 import { useForm } from '@inertiajs/react';
-import { useEffect } from 'react';
+import { Flag, FlagOff } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import NavigatorBox from '../layouts/navigator-question';
 
 const readings = [
@@ -58,91 +59,56 @@ const readings = [
 export default function ReadingQuestion({ onComplete, section }: Props) {
     const { data, setData, post } = useForm({
         answers: {} as Record<number, string>,
-        currentIndex: 0,
         currentQuestionIndex: 0,
         score: 0,
         section: section,
     });
 
-    const currentReading = readings[data.currentIndex];
-    const questions = currentReading.questions;
-    const currentQuestion = questions[data.currentQuestionIndex - 1];
-    // this is for throwing section
-
-    // const handleSelectAnswer = (choice: string) => {
-    //     setData('answers', { ...data.answers, [currentQuestion.id]: choice });
-    // };
-
-    // const handleNavigateQuestion = (index: number) => {
-    //     setData('currentIndex', index);
-    // };
+    const [flagged, setFlag] = useState<Record<number, boolean>>({}) || false;
 
     const flatQuestions = readings.flatMap((reading) => reading.questions.map((q) => ({ ...q, readingId: reading.id })));
 
-    // Fungsi ini akan mencari index global pertanyaan pertama dari reading tertentu
-    const findFirstQuestionIndexByReadingId = (readingId: number) => {
-        return flatQuestions.findIndex((q) => q.readingId === readingId);
+    const currentQuestion = flatQuestions[data.currentQuestionIndex];
+    const currentReading = readings.find((r) => r.id === currentQuestion.readingId)!;
+
+    const toggleFlag = (id: number) => {
+        setFlag((prev) => ({ ...prev, [id]: !prev[id] }));
+        console.log(flagged);
     };
 
-    const handleNextReading = () => {
-        if (data.currentIndex < readings.length - 1) {
-            const nextReadingIndex = data.currentIndex + 1;
-            const nextReading = readings[nextReadingIndex];
-            const nextQuestionIndex = findFirstQuestionIndexByReadingId(nextReading.id);
-
-            setData('currentIndex', nextReadingIndex);
-            setData('currentQuestionIndex', nextQuestionIndex); // Pindah ke pertanyaan pertama dari reading berikutnya
+    const handlePrev = () => {
+        if (data.currentQuestionIndex > 0) {
+            setData('currentQuestionIndex', data.currentQuestionIndex - 1);
         }
     };
 
-    const handlePrevReading = () => {
-        if (data.currentIndex > 0) {
-            const prevReadingIndex = data.currentIndex - 1;
-            const prevReading = readings[prevReadingIndex];
-            const prevQuestionIndex = findFirstQuestionIndexByReadingId(prevReading.id);
-
-            setData('currentIndex', prevReadingIndex);
-            setData('currentQuestionIndex', prevQuestionIndex); // Pindah ke pertanyaan pertama dari reading sebelumnya
+    const handleNext = () => {
+        if (data.currentQuestionIndex < flatQuestions.length - 1) {
+            setData('currentQuestionIndex', data.currentQuestionIndex + 1);
+        } else {
+            handleSubmit();
         }
     };
 
     const handleSubmit = () => {
         let score = 0;
+        flatQuestions.forEach((q) => {
+            const userAnswer = data.answers[q.id];
+            const correctAnswer = q.correctAnswer;
+            if (userAnswer?.trim().toUpperCase() === correctAnswer.trim().toUpperCase()) {
+                score++;
+                console.log(score);
+            }
+        });
 
-        readings.forEach((reading) =>
-            reading.questions.forEach((q) => {
-                const userAnswer = data.answers[q.id];
-                const correctAnswer = q.correctAnswer;
-
-                if (userAnswer?.trim().toUpperCase() === correctAnswer.trim().toUpperCase()) {
-                    score++;
-                }
-            }),
-        );
-
-        console.log('Correct count:', score);
-
-        const countScore = (score / flatQuestions.length) * 30;
-
-        // Kirim seluruh data form + score ke server
-        setData('score', countScore);
-
-        // post('/submit-test', {
-        //     onStart: () => console.log('start'),
-        //     onError: (errors) => console.log('error:', errors),
-        //     onFinish: () => {
-        //         console.log('finish');
-        //         setTimeout(() => onComplete(), 10);
-        //     },
-        // });
+        const finalScore = (score / flatQuestions.length) * 30;
+        setData('score', finalScore);
     };
-    // console.log(data.section);
 
     useEffect(() => {
         if (data.score !== 0) {
             post('/submit-test', data);
-
-            onComplete(); // Ensuring it's called only after score updates
+            onComplete(); // Setelah kirim
         }
     }, [data.score]);
 
@@ -152,77 +118,72 @@ export default function ReadingQuestion({ onComplete, section }: Props) {
         sectionQuestions: readings,
         onComplete: onComplete,
         handleSubmit: handleSubmit,
+        flagged: flagged,
     };
 
     return (
         <div className="flex w-full items-start justify-between gap-8">
-            {/* NAVIGATOR */}
+            {/* Navigator */}
             <NavigatorBox propsNav={propsNavigator} />
 
-            {/* Readings box*/}
-
+            {/* Reading Box */}
             <div className="max-h-[85vh] w-1/3 flex-1 space-y-4 overflow-auto rounded-sm bg-white p-4 shadow-sm">
-                <div className="flex items-center justify-between">
-                    <h2 className="text-xl font-semibold">No. {currentReading.title}</h2>
-                </div>
-
+                <h2 className="text-xl font-semibold">{currentReading.title}</h2>
                 <p className="text-sm break-words text-gray-700 select-none">{currentReading.passage}</p>
             </div>
 
-            {/* QUESTIONS & Answers box*/}
-
+            {/* Question Box */}
             <div className="max-h-[100vh] w-1/3">
-                <div className="max-h-[80vh] flex-1 space-y-4 overflow-auto rounded-t-sm bg-white p-1 shadow-sm">
-                    {questions.map((question, qIdx) => (
-                        <div key={question.id} className="flex flex-col gap-2 p-4">
-                            {/* Questions */}
+                <div className="max-h-[80vh] flex-1 space-y-4 overflow-auto rounded-t-sm bg-white p-4 shadow-sm">
+                    <div key={currentQuestion.id} className="flex flex-col gap-2">
+                        <div className="flex justify-between gap-2">
                             <p className="text-sm leading-relaxed text-gray-700">
-                                {question.id}. {question.question}
+                                {currentQuestion.id}. {currentQuestion.question}
                             </p>
-
-                            {/* Answer */}
-                            <div className="space-y-2">
-                                {question.choices.map((choice, index) => (
-                                    <label
-                                        key={index}
-                                        className={`block cursor-pointer rounded-md border px-4 py-2 ${
-                                            data.answers[question.id] === choice
-                                                ? 'border-blue-500 bg-blue-50'
-                                                : 'border-gray-300 hover:border-blue-400'
-                                        }`}
-                                    >
-                                        <input
-                                            type="radio"
-                                            name={`question-${question.id}`}
-                                            value={choice}
-                                            checked={data.answers[question.id] === choice}
-                                            onChange={() =>
-                                                setData('answers', {
-                                                    ...data.answers,
-                                                    [question.id]: choice,
-                                                })
-                                            }
-                                            className="mr-2"
-                                        />
-                                        <span className="font-medium">{String.fromCharCode(65 + index)}.</span> {choice}
-                                    </label>
-                                ))}
-                            </div>
+                            <Button variant={'outline'} onClick={() => toggleFlag(currentQuestion.id)}>
+                                {flagged[currentQuestion.id] ? (
+                                    <FlagOff className="h-5 w-5 text-red-600" />
+                                ) : (
+                                    <Flag className="'h-5 w-5 text-red-600" />
+                                )}
+                            </Button>
                         </div>
-                    ))}
+                        <div className="space-y-2">
+                            {currentQuestion.choices.map((choice, index) => (
+                                <label
+                                    key={index}
+                                    className={`block cursor-pointer rounded-md border px-4 py-2 ${
+                                        data.answers[currentQuestion.id] === choice
+                                            ? 'border-blue-500 bg-blue-50'
+                                            : 'border-gray-300 hover:border-blue-400'
+                                    }`}
+                                >
+                                    <input
+                                        type="radio"
+                                        name={`question-${currentQuestion.id}`}
+                                        value={choice}
+                                        checked={data.answers[currentQuestion.id] === choice}
+                                        onChange={() =>
+                                            setData('answers', {
+                                                ...data.answers,
+                                                [currentQuestion.id]: choice,
+                                            })
+                                        }
+                                        className="mr-2"
+                                    />
+                                    <span className="font-medium">{String.fromCharCode(65 + index)}.</span> {choice}
+                                </label>
+                            ))}
+                        </div>
+                    </div>
                 </div>
                 <div className="rounded-b-sm bg-white shadow-sm">
                     <div className="mx-2 mb-2 flex justify-between py-2">
-                        <Button size="sm" onClick={handlePrevReading} disabled={data.currentIndex === 0} className="place-self-center">
-                            Prev Readings
+                        <Button size="sm" onClick={handlePrev} disabled={data.currentQuestionIndex === 0}>
+                            Prev
                         </Button>
-                        <Button
-                            size="sm"
-                            onClick={handleNextReading}
-                            disabled={data.currentIndex === readings.length - 1}
-                            className="place-self-center"
-                        >
-                            Next Readings
+                        <Button size="sm" onClick={handleNext}>
+                            {data.currentQuestionIndex === flatQuestions.length - 1 ? 'Next Section' : 'Next'}
                         </Button>
                     </div>
                 </div>

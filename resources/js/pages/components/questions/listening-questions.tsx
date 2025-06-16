@@ -1,7 +1,8 @@
 import { Button } from '@/components/ui/button';
 import { Props } from '@/types';
 import { useForm } from '@inertiajs/react';
-import { useEffect } from 'react';
+import { Flag, FlagOff } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import NavigatorBox from '../layouts/navigator-question';
 import TextToSpeech from '../utils/TextToSpeech';
 
@@ -48,39 +49,34 @@ export default function ReadingQuestion({ onComplete, section }: Props) {
     const { data, setData, post } = useForm({
         answers: {} as Record<number, string>,
         currentIndex: 0,
-        currentQuestionIndex: 1,
+        currentQuestionIndex: 0,
         score: 0,
         section: section,
     });
 
-    const currentListening = listenings[data.currentIndex];
-    const questions = currentListening.questions;
+    const [flagged, setFlag] = useState<Record<number, boolean>>({}) || false;
 
     const flatQuestions = listenings.flatMap((listening) => listening.questions.map((q) => ({ ...q, listeningId: listening.id })));
 
-    const findFirstQuestionIndexByReadingId = (listeningId: number) => {
-        return flatQuestions.findIndex((q) => q.listeningId === listeningId);
+    const currentQuestion = flatQuestions[data.currentQuestionIndex];
+    const currentListening = listenings.find((r) => r.id === currentQuestion.listeningId)!;
+
+    const toggleFlag = (id: number) => {
+        setFlag((prev) => ({ ...prev, [id]: !prev[id] }));
+        console.log(flagged);
     };
 
-    const handleNextReading = () => {
-        if (data.currentIndex < listenings.length - 1) {
-            const nextlisteningIndex = data.currentIndex + 1;
-            const nextlistening = listenings[nextlisteningIndex];
-            const nextQuestionIndex = findFirstQuestionIndexByReadingId(nextlistening.id);
-
-            setData('currentIndex', nextlisteningIndex);
-            setData('currentQuestionIndex', nextQuestionIndex); // Pindah ke pertanyaan pertama dari reading berikutnya
+    const handlePrev = () => {
+        if (data.currentQuestionIndex > 0) {
+            setData('currentQuestionIndex', data.currentQuestionIndex - 1);
         }
     };
 
-    const handlePrevReading = () => {
-        if (data.currentIndex > 0) {
-            const prevListeningIndex = data.currentIndex - 1;
-            const prevListening = listenings[prevListeningIndex];
-            const prevQuestionIndex = findFirstQuestionIndexByReadingId(prevListening.id);
-
-            setData('currentIndex', prevListeningIndex);
-            setData('currentQuestionIndex', prevQuestionIndex); // Pindah ke pertanyaan pertama dari reading sebelumnya
+    const handleNext = () => {
+        if (data.currentQuestionIndex < flatQuestions.length - 1) {
+            setData('currentQuestionIndex', data.currentQuestionIndex + 1);
+        } else {
+            handleSubmit();
         }
     };
 
@@ -99,17 +95,7 @@ export default function ReadingQuestion({ onComplete, section }: Props) {
         );
 
         const countScore = (score / flatQuestions.length) * 30;
-
-        // Kirim seluruh data form + score ke server
         setData('score', countScore);
-        // post('/submit-test', {
-        //     onStart: () => console.log('start'),
-        //     onError: (errors) => console.log('error:', errors),
-        //     onFinish: () => {
-        //         console.log('finish');
-        //         setTimeout(() => onComplete(), 10);
-        //     },
-        // });
     };
 
     useEffect(() => {
@@ -125,6 +111,7 @@ export default function ReadingQuestion({ onComplete, section }: Props) {
         sectionQuestions: listenings,
         onComplete: onComplete,
         handleSubmit: handleSubmit,
+        flagged: flagged,
     };
 
     return (
@@ -146,57 +133,59 @@ export default function ReadingQuestion({ onComplete, section }: Props) {
             </div>
 
             <div className="max-h-[100vh] w-1/3">
-                <div className="max-h-[80vh] flex-1 space-y-4 overflow-auto rounded-t-sm bg-white p-1 shadow-sm">
-                    {questions.map((question, qIdx) => (
-                        <div key={question.id} className="flex-1 space-y-4 rounded-sm bg-white p-4">
-                            {/* QUESTIONS */}
+                <div className="max-h-[80vh] flex-1 space-y-4 overflow-auto rounded-t-sm bg-white p-4 shadow-sm">
+                    <div key={currentQuestion.id} className="flex flex-col gap-2">
+                        {/* QUESTIONS */}
+                        <div className='gap-2" flex justify-between'>
                             <p className="text-sm leading-relaxed text-gray-700">
-                                {question.id}. {question.question}
+                                {currentQuestion.id}. {currentQuestion.question}
                             </p>
 
-                            {/* Answer */}
-                            <div className="space-y-2">
-                                {question.choices.map((choice, index) => (
-                                    <label
-                                        key={index}
-                                        className={`block cursor-pointer rounded-md border px-4 py-2 ${
-                                            data.answers[question.id] === choice
-                                                ? 'border-blue-500 bg-blue-50'
-                                                : 'border-gray-300 hover:border-blue-400'
-                                        }`}
-                                    >
-                                        <input
-                                            type="radio"
-                                            name={`question-${question.id}`}
-                                            value={choice}
-                                            checked={data.answers[question.id] === choice}
-                                            onChange={() =>
-                                                setData('answers', {
-                                                    ...data.answers,
-                                                    [question.id]: choice,
-                                                })
-                                            }
-                                            className="mr-2"
-                                        />
-                                        <span className="font-medium">{String.fromCharCode(65 + index)}.</span> {choice}
-                                    </label>
-                                ))}
-                            </div>
+                            <Button variant={'outline'} onClick={() => toggleFlag(currentQuestion.id)}>
+                                {flagged[currentQuestion.id] ? (
+                                    <FlagOff className="h-5 w-5 text-red-600" />
+                                ) : (
+                                    <Flag className="'h-5 w-5 text-red-600" />
+                                )}
+                            </Button>
                         </div>
-                    ))}
+                        {/* Answer */}
+                        <div className="space-y-2">
+                            {currentQuestion.choices.map((choice, index) => (
+                                <label
+                                    key={index}
+                                    className={`block cursor-pointer rounded-md border px-4 py-2 ${
+                                        data.answers[currentQuestion.id] === choice
+                                            ? 'border-blue-500 bg-blue-50'
+                                            : 'border-gray-300 hover:border-blue-400'
+                                    }`}
+                                >
+                                    <input
+                                        type="radio"
+                                        name={`question-${currentQuestion.id}`}
+                                        value={choice}
+                                        checked={data.answers[currentQuestion.id] === choice}
+                                        onChange={() =>
+                                            setData('answers', {
+                                                ...data.answers,
+                                                [currentQuestion.id]: choice,
+                                            })
+                                        }
+                                        className="mr-2"
+                                    />
+                                    <span className="font-medium">{String.fromCharCode(65 + index)}.</span> {choice}
+                                </label>
+                            ))}
+                        </div>
+                    </div>
                 </div>
                 <div className="rounded-b-sm bg-white shadow-sm">
                     <div className="mx-2 mb-2 flex justify-between py-2">
-                        <Button size="sm" onClick={handlePrevReading} disabled={data.currentIndex === 0} className="place-self-center">
-                            Prev Readings
+                        <Button size="sm" onClick={handlePrev} disabled={data.currentQuestionIndex === 0}>
+                            Prev
                         </Button>
-                        <Button
-                            size="sm"
-                            onClick={handleNextReading}
-                            disabled={data.currentIndex === listenings.length - 1}
-                            className="place-self-center"
-                        >
-                            Next Readings
+                        <Button size="sm" onClick={handleNext}>
+                            {data.currentQuestionIndex === flatQuestions.length - 1 ? 'Next Section' : 'Next'}
                         </Button>
                     </div>
                 </div>

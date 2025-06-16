@@ -11,9 +11,11 @@ export default function Scoreboard() {
     const speakingScore = Number(props.speakingScore) || 0;
     const writingScore = Number(props.writingScore) || 0;
     const totalScore = readingScore + listeningScore + speakingScore + writingScore;
+    const maxScore = 30;
 
-    // console.log(readingScore);
-    // console.log(listeningScore);
+    const progressWidth = (score: number) => {
+        return (score / maxScore) * 100;
+    };
 
     return (
         <>
@@ -34,22 +36,104 @@ export default function Scoreboard() {
                                 <span className="font-medium">Name : {username}</span>
                             </div>
                             <div>
-                                <span className="font-medium">Overall Score: {totalScore}</span>
+                                <span className="font-medium">
+                                    Overall Score: {totalScore} / {maxScore * 4}
+                                </span>
                             </div>
-                            <div className="space-y-1">
+                            <div className="gap-8 sm:grid sm:grid-rows-1">
                                 <div>
-                                    <span className="font-medium">Reading : {readingScore}</span>
-                                </div>
-                                <div>
-                                    <span className="font-medium">Listening : {listeningScore}</span>
-                                </div>
-                                <div>
-                                    <span className="font-medium">Speaking : {speakingScore}</span>
-                                </div>
-                                <div>
-                                    <span className="font-medium">Writing : {writingScore}</span>
+                                    <dl>
+                                        <h3 className="font-medium">Reading</h3>
+                                        <dd className="mb-3 flex w-full items-center">
+                                            <div className="me-2 h-2.5 w-1/2 rounded-sm bg-gray-200 dark:bg-gray-700">
+                                                <div
+                                                    className="h-2.5 rounded-sm bg-blue-600 dark:bg-blue-500"
+                                                    style={{ width: `${progressWidth(readingScore)}%` }}
+                                                ></div>
+                                            </div>
+                                            <div className="flex w-1/3 justify-between gap-2">
+                                                <p className="text-sm font-medium text-gray-600">
+                                                    <span>{readingScore}</span> / <span>{maxScore}</span>
+                                                </p>
+                                                <p className="text-sm font-medium text-gray-600">Interdimate</p>
+                                            </div>
+                                        </dd>
+                                    </dl>
+                                    <dl>
+                                        <h3 className="font-medium">Listening</h3>
+                                        <dd className="mb-3 flex w-full items-center">
+                                            <div className="me-2 h-2.5 w-1/2 rounded-sm bg-gray-200 dark:bg-gray-700">
+                                                <div
+                                                    className="h-2.5 rounded-sm bg-blue-600 dark:bg-blue-500"
+                                                    style={{ width: `${progressWidth(listeningScore)}%` }}
+                                                ></div>
+                                            </div>
+                                            <div className="flex w-1/3 justify-between gap-2">
+                                                <p className="text-sm font-medium text-gray-600">
+                                                    {listeningScore} / {maxScore}
+                                                </p>
+                                                <p className="text-sm font-medium text-gray-600">Interdimate</p>
+                                            </div>
+                                        </dd>
+                                    </dl>
+                                    <dl>
+                                        <h3 className="font-medium">Speaking</h3>
+                                        <dd className="mb-3 flex items-center">
+                                            <div className="me-2 h-2.5 w-1/2 rounded-sm bg-gray-200 dark:bg-gray-700">
+                                                <div
+                                                    className="h-2.5 rounded-sm bg-blue-600 dark:bg-blue-500"
+                                                    style={{ width: `${progressWidth(speakingScore)}%` }}
+                                                ></div>
+                                            </div>
+                                            <div className="flex w-1/3 justify-between gap-2">
+                                                <p className="text-sm font-medium text-gray-600">
+                                                    {speakingScore} / {maxScore}
+                                                </p>
+                                                <p className="text-sm font-medium text-gray-600">Interdimate</p>
+                                            </div>
+                                        </dd>
+                                    </dl>
+                                    <dl>
+                                        <h3 className="font-medium">Writing</h3>
+                                        <dd className="flex items-center">
+                                            <div className="me-2 h-2.5 w-1/2 rounded-sm bg-gray-200 dark:bg-gray-700">
+                                                <div
+                                                    className="h-2.5 rounded-sm bg-blue-600 dark:bg-blue-500"
+                                                    style={{ width: `${progressWidth(writingScore)}%` }}
+                                                ></div>
+                                            </div>
+                                            <div className="flex w-1/3 justify-between gap-2">
+                                                <p className="text-sm font-medium text-gray-600">
+                                                    <span>{writingScore}</span> / <span>{maxScore}</span>
+                                                </p>
+                                                <p className="text-sm font-medium text-gray-600">Interdimate</p>
+                                            </div>
+                                        </dd>
+                                    </dl>
                                 </div>
                             </div>
+                            {/* <div className="space-y-1">
+                                <div>
+                                    <span className="font-medium">
+                                        Reading : {readingScore} / {maxScore}
+                                    </span>
+                                </div>
+                                <div>
+                                    <span className="font-medium">
+                                        Listening : {listeningScore} / {maxScore}
+                                    </span>
+                                </div>
+                                <div>
+                                    <span className="font-medium">
+                                        Speaking : {speakingScore} / {maxScore}
+                                    </span>
+                                </div>
+                                <div>
+                                    <span className="font-medium">
+                                        Writing : {writingScore} / {maxScore}
+                                    </span>
+                                </div>
+                            </div> */}
                         </CardContent>
 
                         <CardFooter className="justify-end"> footer </CardFooter>

@@ -1,10 +1,5 @@
 import { usePage } from '@inertiajs/react';
-
-type Tquestionpage = {
-    id: string;
-    component: () => void;
-    nextId: string;
-};
+import { Flag, FlagOff } from 'lucide-react';
 
 type NavigatorBoxProps = {
     propsNav: {
@@ -14,12 +9,12 @@ type NavigatorBoxProps = {
         };
         setData: (field: string, value: any) => void;
         sectionQuestions: any[];
-        handleSubmit: () => void;
+        flagged?: Record<number, boolean>;
     };
 };
 
 export default function NavigatorBox({ propsNav }: NavigatorBoxProps) {
-    const { props, setData, sectionQuestions, handleSubmit } = propsNav;
+    const { props, setData, sectionQuestions, flagged = {} } = propsNav;
     const { section } = usePage().props as { section?: string };
 
     const { username } = usePage().props as { username?: string };
@@ -37,7 +32,6 @@ export default function NavigatorBox({ propsNav }: NavigatorBoxProps) {
 
         if (isSectionPerQuestion(section)) {
             setData('currentQuestionIndex', questionIndex);
-            console.log(section);
         } else {
             // reading/listening
             const readingIndex = sectionQuestions.findIndex((r) => r.id === question.readingId);
@@ -56,6 +50,7 @@ export default function NavigatorBox({ propsNav }: NavigatorBoxProps) {
 
             <div className="grid grid-cols-5 gap-2 text-sm">
                 {flatQuestions.map((q, i) => {
+                    const isFlagged = flagged[q.id];
                     const isActive = props.currentQuestionIndex === i;
                     const isAnswered = props.answers.hasOwnProperty(q.id);
 
@@ -63,7 +58,13 @@ export default function NavigatorBox({ propsNav }: NavigatorBoxProps) {
                         <button
                             key={q.id}
                             className={`h-8 w-8 cursor-pointer rounded-full border text-center ${
-                                isActive ? 'bg-indigo-600 text-white' : isAnswered ? 'bg-green-700 text-white' : 'bg-gray-100 hover:bg-indigo-100'
+                                isActive
+                                    ? 'bg-indigo-600 text-white'
+                                    : isAnswered
+                                      ? 'bg-green-700 text-white'
+                                      : isFlagged
+                                        ? 'bg-yellow-200 text-black'
+                                        : 'bg-gray-100 hover:bg-indigo-100'
                             }`}
                             onClick={() => handleNavigateIndex(i)}
                         >
@@ -72,10 +73,15 @@ export default function NavigatorBox({ propsNav }: NavigatorBoxProps) {
                     );
                 })}
             </div>
-
-            <button onClick={handleSubmit} type="submit" className="w-full rounded bg-orange-500 py-2 text-sm text-white hover:bg-orange-600">
-                Submit
-            </button>
+            <div className="mt-2 flex flex-col gap-1">
+                <p className="text-md font-semibold text-green-800">Hint</p>
+                <div className="flex items-center">
+                    <Flag className="h-3 w-3" /> <p className="text-sm">: to inform your answer </p>
+                </div>
+                <div className="flex items-center">
+                    <FlagOff className="h-3 w-3" /> <p className="text-sm">: to stop inform your answer </p>
+                </div>
+            </div>
         </div>
     );
 }

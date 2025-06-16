@@ -1,7 +1,8 @@
 import { Button } from '@/components/ui/button';
 import { Props } from '@/types';
 import { useForm } from '@inertiajs/react';
-import { useEffect } from 'react';
+import { Flag, FlagOff } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import NavigatorBox from '../layouts/navigator-question';
 
 const writings = [
@@ -29,19 +30,17 @@ export default function WritingQuestion({ onComplete, section }: Props) {
     const { data, setData, post } = useForm({
         answers: {} as Record<number, string>,
         currentIndex: 0,
-        currentQuestionIndex: 1,
+        currentQuestionIndex: 0,
         score: 0,
         section: section,
     });
 
-    const currentWriting = writings[data.currentIndex];
-    const questions = currentWriting.questions;
+    const [flagged, setFlag] = useState<Record<number, boolean>>({}) || false;
 
-    const flatQuestions = writings.flatMap((writings) => writings.questions.map((q) => ({ ...q, writingId: writings.id })));
+    const flatQuestions = writings.flatMap((writing) => writing.questions.map((q) => ({ ...q, writingId: writing.id })));
 
-    const findFirstQuestionIndexByReadingId = (writingId: number) => {
-        return flatQuestions.findIndex((q) => q.writingId === writingId);
-    };
+    const currentQuestion = flatQuestions[data.currentQuestionIndex];
+    const currentWriting = writings.find((r) => r.id === currentQuestion.writingId)!;
 
     const handleAnswerChange = (questionId: number, value: string) => {
         if (value) {
@@ -57,30 +56,27 @@ export default function WritingQuestion({ onComplete, section }: Props) {
         }
     };
 
-    const handleNextReading = () => {
-        if (data.currentIndex < writings.length - 1) {
-            const nextWritingIndex = data.currentIndex + 1;
-            const nextWriting = writings[nextWritingIndex];
-            const nextQuestionIndex = findFirstQuestionIndexByReadingId(nextWriting.id);
+    const toggleFlag = (id: number) => {
+        setFlag((prev) => ({ ...prev, [id]: !prev[id] }));
+        console.log(flagged);
+    };
 
-            setData('currentIndex', nextWritingIndex);
-            setData('currentQuestionIndex', nextQuestionIndex); // Pindah ke pertanyaan pertama dari reading berikutnya
+    const handlePrev = () => {
+        if (data.currentQuestionIndex > 0) {
+            setData('currentQuestionIndex', data.currentQuestionIndex - 1);
         }
     };
 
-    const handlePrevReading = () => {
-        if (data.currentIndex > 0) {
-            const prevReadingIndex = data.currentIndex - 1;
-            const prevReading = writings[prevReadingIndex];
-            const prevQuestionIndex = findFirstQuestionIndexByReadingId(prevReading.id);
-
-            setData('currentIndex', prevReadingIndex);
-            setData('currentQuestionIndex', prevQuestionIndex); // Pindah ke pertanyaan pertama dari reading sebelumnya
+    const handleNext = () => {
+        if (data.currentQuestionIndex < flatQuestions.length - 1) {
+            setData('currentQuestionIndex', data.currentQuestionIndex + 1);
+        } else {
+            handleSubmit();
         }
     };
 
     const handleSubmit = async () => {
-        if (Object.values(data.answers).length < questions.length) {
+        if (Object.values(data.answers).length < currentWriting.questions.length) {
             alert("Test isn't Finish !!!");
         }
         let totalScore = 0;
@@ -120,20 +116,6 @@ export default function WritingQuestion({ onComplete, section }: Props) {
         }
 
         setData('score', totalScore);
-        // Submit the data
-        // post('/submit-test', {
-        //     // correctCount,
-        //     onStart: () => console.log('start'),
-        //     onError: (errors) => {
-        //         console.log('error:', errors);
-        //     },
-        //     onFinish: () => {
-        //         console.log('finish');
-        //         setTimeout(() => {
-        //             onComplete();
-        //         }, 5);
-        //     },
-        // });
     };
 
     useEffect(() => {
@@ -149,6 +131,7 @@ export default function WritingQuestion({ onComplete, section }: Props) {
         sectionQuestions: writings,
         onComplete: onComplete,
         handleSubmit: handleSubmit,
+        flagged: flagged,
     };
 
     return (
@@ -168,44 +151,44 @@ export default function WritingQuestion({ onComplete, section }: Props) {
 
             {/* Question & Answer Box */}
             <div className="max-h-[100vh] w-1/3">
-                <div className="max-h-[80vh] flex-1 space-y-4 overflow-auto rounded-t-sm bg-white p-1 shadow-sm">
-                    {questions.map((question, qidx) => (
-                        <div key={question.id} className="flex flex-col gap-2 p-4">
-                            {/* Question */}
+                <div className="max-h-[80vh] flex-1 space-y-4 overflow-auto rounded-t-sm bg-white p-4 shadow-sm">
+                    <div key={currentQuestion.id} className="flex flex-col gap-2">
+                        <div className="flex justify-between gap-2">
                             <p className="text-sm leading-relaxed text-gray-700">
-                                {question.id}. {question.question}
+                                {currentQuestion.id}. {currentQuestion.question}
                             </p>
-
-                            {/* Answer */}
-                            <div className="space-y-2">
-                                <label htmlFor="answer" className="mb-1 block font-medium">
-                                    Your Answer
-                                </label>
-                                <textarea
-                                    id="answer"
-                                    key={`question-${question.id}`}
-                                    name={`question-${question.id}`}
-                                    className="min-h-[200px] w-full resize-none rounded border p-3"
-                                    placeholder="Type your answer here . . . ."
-                                    value={data.answers[question.id] || ''}
-                                    onChange={(e) => handleAnswerChange(question.id, e.target.value)}
-                                />
-                            </div>
+                            <Button variant={'outline'} onClick={() => toggleFlag(currentQuestion.id)}>
+                                {flagged[currentQuestion.id] ? (
+                                    <FlagOff className="h-5 w-5 text-red-600" />
+                                ) : (
+                                    <Flag className="'h-5 w-5 text-red-600" />
+                                )}
+                            </Button>
                         </div>
-                    ))}
+                        {/* Answer */}
+                        <div className="space-y-2">
+                            <label htmlFor="answer" className="mb-1 block font-medium">
+                                Your Answer
+                            </label>
+                            <textarea
+                                id="answer"
+                                key={`question-${currentQuestion.id}`}
+                                name={`question-${currentQuestion.id}`}
+                                className="min-h-[200px] w-full resize-none rounded border p-3"
+                                placeholder="Type your answer here . . . ."
+                                value={data.answers[currentQuestion.id] || ''}
+                                onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value)}
+                            />
+                        </div>
+                    </div>
                 </div>
                 <div className="rounded-b-sm bg-white shadow-sm">
                     <div className="mx-2 mb-2 flex justify-between py-2">
-                        <Button size="sm" onClick={handlePrevReading} disabled={data.currentIndex === 0} className="place-self-center">
-                            Prev Readings
+                        <Button size="sm" onClick={handlePrev} disabled={data.currentQuestionIndex === 0}>
+                            Prev
                         </Button>
-                        <Button
-                            size="sm"
-                            onClick={handleNextReading}
-                            disabled={data.currentIndex === writings.length - 1}
-                            className="place-self-center"
-                        >
-                            Next Readings
+                        <Button size="sm" onClick={handleNext}>
+                            {data.currentQuestionIndex === flatQuestions.length - 1 ? 'Next Section' : 'Next'}
                         </Button>
                     </div>
                 </div>
