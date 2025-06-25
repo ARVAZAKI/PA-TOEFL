@@ -41,9 +41,40 @@ export interface User {
     [key: string]: unknown; // This allows for additional properties...
 }
 
+export interface Questions {
+    id: number;
+    question: string;
+    choices?: string[];
+    correctAnswer?: string;
+}
 
+export interface ReadingSet {
+    id: number;
+    title: string;
+    passage: string;
+    questions: Question[];
+}
+export interface ListeningSet {
+    id: number;
+    title: string;
+    passage: string;
+    questions: Question[];
+}
+export interface SpeakingSet {
+    id: number;
+    title: string;
+    passage: string;
+    questions: Question[];
+}
+export interface WritingSet {
+    id: number;
+    title: string;
+    passage: string;
+    questions: Question[];
+}
 
 export interface Props {
     onComplete: () => void;
     section: string;
-};
+    questions: ReadingSet[] | ListeningSet[] | SpeakingSet[] | WritingSet[];
+}

@@ -29,7 +29,10 @@ const questionPage = [
 ];
 
 export default function TestQuestion() {
-    const { section } = usePage().props as { section?: string };
+    const { section, questions } = usePage().props as {
+        section?: string;
+        questions?: any[];
+    };
 
     const currentPage = questionPage.find((page) => page.id === section);
 
@@ -75,7 +78,7 @@ export default function TestQuestion() {
 
                 <div className="mt-[70px] flex w-full items-start justify-center bg-[#F2F2F2] p-4">
                     <div className="flex h-full w-full items-start justify-center overflow-hidden">
-                        <Component onComplete={handleComplete} section={currentPage?.id} />
+                        <Component onComplete={handleComplete} section={currentPage?.id} questions={questions} />
                     </div>
                 </div>
             </div>
