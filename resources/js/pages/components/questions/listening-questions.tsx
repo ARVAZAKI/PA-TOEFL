@@ -10,7 +10,21 @@ const listenings = [
     {
         id: 1,
         title: 'Listening 1',
-        passage: `A topic of increasing relevance`,
+        passage: `Advisor: Hi John. How can I help you today?
+
+        John: Hi, I’m thinking about changing my major from biology to environmental science, but I’m not sure if it’s the right decision.
+
+        Advisor: That’s a big decision. What’s making you consider the change?
+
+        John: Well, I’ve always been interested in environmental issues, and I think environmental science might be a better fit for my career goals. But I’m worried about how this will affect my graduation timeline.
+
+        Advisor: Changing majors can sometimes extend your time in school, but it’s important to study something you’re passionate about. Have you checked how many of your biology credits can be transferred to the environmental science program?
+
+        John: Not yet. I wanted to get your opinion first.
+
+        Advisor: I recommend meeting with the department head of environmental science to see how your current credits apply. Also, consider if you’re willing to take additional courses during summer sessions to stay on track for graduation.
+
+        John: That’s a good idea. I’ll set up a meeting with the department head. Thanks for your advice!`,
         questions: [
             { id: 1, question: 'Tono membaca artikel dan menyimpulkan...', choices: ['A', 'B', 'C', 'D'], correctAnswer: 'A' },
             { id: 2, question: 'Apa tujuan utama artikel?', choices: ['A', 'B', 'C', 'D'], correctAnswer: 'B' },

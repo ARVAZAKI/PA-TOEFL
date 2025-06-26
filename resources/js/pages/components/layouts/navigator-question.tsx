@@ -58,13 +58,15 @@ export default function NavigatorBox({ propsNav }: NavigatorBoxProps) {
                         <button
                             key={q.id}
                             className={`h-8 w-8 cursor-pointer rounded-full border text-center ${
-                                isActive
-                                    ? 'bg-indigo-600 text-white'
-                                    : isAnswered
-                                      ? 'bg-green-700 text-white'
-                                      : isFlagged
-                                        ? 'bg-yellow-200 text-black'
-                                        : 'bg-gray-100 hover:bg-indigo-100'
+                                isAnswered && isFlagged
+                                    ? 'bg-yellow-200 text-black'
+                                    : isActive
+                                      ? 'bg-indigo-600 text-white'
+                                      : isAnswered
+                                        ? 'bg-green-700 text-white'
+                                        : isFlagged
+                                          ? 'bg-yellow-200 text-black'
+                                          : 'bg-gray-100 hover:bg-indigo-100'
                             }`}
                             onClick={() => handleNavigateIndex(i)}
                         >
