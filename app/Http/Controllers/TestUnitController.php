@@ -11,7 +11,6 @@ class TestUnitController extends Controller
         $username = $request->input('username');
         session(['username' => $username]);
 
-        // Bisa redirect saja
         return redirect()->route('test.show', ['section' => 'general']);
     }
 
@@ -24,7 +23,13 @@ class TestUnitController extends Controller
         $listeningScore = session('ListeningScore', 0);
         $speakingScore = session('SpeakingScore', 0);
         $writingScore = session('WritingScore', 0);
-        $username = session('username');
+
+        $answeredCounts = [
+            'reading' => (bool) session("AnsweredCountReading", false),
+            'listening' => (bool) session('AnsweredCountListening', false),
+            'speaking' => (bool) session('AnsweredCountSpeaking', false),
+            'writing' => (bool) session('AnsweredCountWriting', false),
+        ];
 
         // render halaman test (test-question.tsx)
         if (str_ends_with($section, '-question')) {
@@ -44,7 +49,8 @@ class TestUnitController extends Controller
                 'listeningScore' => $listeningScore,
                 'speakingScore' => $speakingScore,
                 'writingScore' => $writingScore,
-                'questions' => $questions, //
+                'answeredCounts' => $answeredCounts,
+                'questions' => $questions,
             ]);
         }
 
@@ -67,17 +73,20 @@ class TestUnitController extends Controller
         switch ($section) {
             case "reading-question":
                 session(['ReadingScore' => $score]);
+                session(['AnsweredCountReading' => true]);
                 break;
             case "listening-question":
                 session(['ListeningScore' => $score]);
+                session(['AnsweredCountListening' => true]);
                 break;
             case "speaking-question":
                 session(['SpeakingScore' => $score]);
+                session(['AnsweredCountSpeaking' => true]);
                 break;
             case "writing-question":
                 session(['WritingScore' => $score]);
+                session(['AnsweredCountWriting' => true]);
                 break;
-
         }
     }
 

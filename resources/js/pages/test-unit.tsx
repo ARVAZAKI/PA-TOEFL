@@ -55,8 +55,6 @@ const sections = [
 export default function TestInfoPage() {
     const { section } = usePage().props as { section?: string };
 
-    const { username } = usePage().props;
-
     const sectionId = section ?? 'general';
 
     const current = sections.find((s) => s.id === sectionId);
