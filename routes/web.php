@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use App\Http\Controllers\TestUnitController;
+use App\Http\Controllers\Admin\AdminController;
 
 Route::get('/', function () {
     return Inertia::render('welcome');
@@ -17,12 +18,19 @@ Route::post('/reset-test', [TestUnitController::class, 'resetTest'])->name('rese
 Route::post('/submit-session', [TestUnitController::class, 'ThrowSession'])->name('ThrowSession');
 
 Route::get('/scoreboard', [TestUnitController::class, 'scoreboard'])->name('scoreboard');
-;
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', function () {
         return Inertia::render('dashboard');
     })->name('dashboard');
+});
+
+// Admin Routes
+Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->name('admin.')->group(function () {
+    Route::get('/dashboard', [AdminController::class, 'dashboard'])->name('dashboard');
+    Route::get('/toefls', [AdminController::class, 'toefls'])->name('toefls');
+    Route::get('/users', [AdminController::class, 'users'])->name('users');
+    Route::get('/results', [AdminController::class, 'results'])->name('results');
 });
 
 require __DIR__ . '/settings.php';

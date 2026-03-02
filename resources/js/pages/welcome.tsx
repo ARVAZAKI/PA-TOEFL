@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { type SharedData } from '@/types';
-import { Head, useForm, usePage } from '@inertiajs/react';
+import { Head, useForm, usePage, Link } from '@inertiajs/react';
 
 export default function Welcome() {
     const { data, setData, post } = useForm({
@@ -30,6 +30,30 @@ export default function Welcome() {
                     <div className="absolute inset-0" style={{
                         backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%236366f1' fill-opacity='0.1'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
                     }} />
+                </div>
+
+                {/* Login Link - Top Right */}
+                <div className="absolute top-6 right-6 z-20">
+                    {auth.user ? (
+                        <Link href={auth.user.role === 'admin' ? '/admin/dashboard' : '/dashboard'}>
+                            <Button variant="outline" className="bg-white/80 backdrop-blur-sm">
+                                Go to Dashboard
+                            </Button>
+                        </Link>
+                    ) : (
+                        <div className="flex gap-3">
+                            <Link href="/login">
+                                <Button variant="outline" className="bg-white/80 backdrop-blur-sm">
+                                    Login
+                                </Button>
+                            </Link>
+                            <Link href="/register">
+                                <Button className="bg-gradient-to-r from-blue-600 to-indigo-600">
+                                    Register
+                                </Button>
+                            </Link>
+                        </div>
+                    )}
                 </div>
 
                 {/* Main Card */}

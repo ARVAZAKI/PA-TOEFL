@@ -1,5 +1,5 @@
 import { Head, useForm } from '@inertiajs/react';
-import { LoaderCircle } from 'lucide-react';
+import { LoaderCircle, BookOpen } from 'lucide-react';
 import { FormEventHandler } from 'react';
 
 import InputError from '@/components/input-error';
@@ -38,6 +38,12 @@ export default function Login({ status, canResetPassword }: LoginProps) {
     return (
         <AuthLayout title="Log in to your account" description="Enter your email and password below to log in">
             <Head title="Log in" />
+
+            {status && (
+                <div className="mb-4 rounded-lg bg-green-50 border border-green-200 p-3 text-center text-sm font-medium text-green-600">
+                    {status}
+                </div>
+            )}
 
             <form className="flex flex-col gap-6" onSubmit={submit}>
                 <div className="grid gap-6">
@@ -104,7 +110,29 @@ export default function Login({ status, canResetPassword }: LoginProps) {
                 </div>
             </form>
 
-            {status && <div className="mb-4 text-center text-sm font-medium text-green-600">{status}</div>}
+            {/* Demo Accounts Info */}
+            <div className="mt-6 rounded-lg border border-blue-200 bg-blue-50 p-4">
+                <div className="flex items-start gap-3">
+                    <BookOpen className="h-5 w-5 text-blue-600 mt-0.5" />
+                    <div className="flex-1">
+                        <h4 className="font-semibold text-sm text-blue-900 mb-2">Demo Accounts</h4>
+                        <div className="space-y-2 text-xs text-blue-700">
+                            <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <p className="font-medium">Admin Access:</p>
+                                    <p>📧 admin@toefl.com</p>
+                                    <p>🔑 password</p>
+                                </div>
+                                <div>
+                                    <p className="font-medium">Student Access:</p>
+                                    <p>📧 student@toefl.com</p>
+                                    <p>🔑 password</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </AuthLayout>
     );
 }

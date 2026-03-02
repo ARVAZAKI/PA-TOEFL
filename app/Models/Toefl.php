@@ -11,8 +11,19 @@ class Toefl extends Model
         'status'
     ];
 
-     public function subtests()
+    public function subtests()
     {
         return $this->belongsToMany(Subtest::class, 'toefl_subtests', 'toefl_id', 'subtest_id');
+    }
+
+    public function userTestSessions()
+    {
+        return $this->hasMany(UserTestSession::class);
+    }
+
+    // Helper methods
+    public function isActive(): bool
+    {
+        return $this->status === 'active';
     }
 }

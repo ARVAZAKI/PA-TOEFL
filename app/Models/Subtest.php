@@ -14,4 +14,19 @@ class Subtest extends Model
     {
         return $this->belongsToMany(Toefl::class, 'toefl_subtests', 'subtest_id', 'toefl_id');
     }
+
+    public function passages()
+    {
+        return $this->hasMany(Passage::class)->orderBy('order');
+    }
+
+    public function questions()
+    {
+        return $this->hasMany(Question::class)->orderBy('order');
+    }
+
+    public function userSubtestProgress()
+    {
+        return $this->hasMany(UserSubtestProgress::class);
+    }
 }
