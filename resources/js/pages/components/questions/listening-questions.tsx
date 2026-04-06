@@ -3,16 +3,17 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Props } from '@/types';
 import { useForm } from '@inertiajs/react';
 import { Flag, FlagOff } from 'lucide-react';
-import { forwardRef, useImperativeHandle, useState } from 'react';
+import { forwardRef, useImperativeHandle, useRef, useState } from 'react';
 import NavigatorBox from '../layouts/navigator-question';
-import TextToSpeech from '../utils/TextToSpeech';
 
 const ListeningQuestion = forwardRef(function ListeningQuestion({ onComplete, section, questions }: Props, ref) {
-    const { data, setData, post } = useForm({
+    const { data, setData, post, transform } = useForm({
         answers: {} as Record<number, string>,
         currentIndex: 0,
         currentQuestionIndex: 0,
         score: 0,
+        correctCount: 0,
+        totalQuestions: 0,
         section: section,
     });
 
@@ -20,6 +21,8 @@ const ListeningQuestion = forwardRef(function ListeningQuestion({ onComplete, se
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [openDialog, setOpenDialog] = useState(false);
     const [message, setMessage] = useState('');
+    const [playedPassages, setPlayedPassages] = useState<Set<number>>(new Set());
+    const audioRef = useRef<HTMLAudioElement>(null);
 
     const handleButtonDialog = () => {
         const unansweredQuestions = flatQuestions.filter((q) => !data.answers[q.id]);
@@ -65,18 +68,21 @@ const ListeningQuestion = forwardRef(function ListeningQuestion({ onComplete, se
     };
 
     const calculateScore = () => {
-        let score = 0;
+        let correctCount = 0;
         (questions as any[]).forEach((listening: any) =>
             listening.questions.forEach((q: any) => {
                 const userAnswer = data.answers[q.id];
                 const correctAnswer = q.correctAnswer;
 
                 if (userAnswer?.trim().toUpperCase() === correctAnswer.trim().toUpperCase()) {
-                    score++;
+                    correctCount++;
                 }
             }),
         );
-        return (score / flatQuestions.length) * 30;
+        return {
+            correctCount,
+            finalScore: Math.round((correctCount / flatQuestions.length) * 30),
+        };
     };
 
     const handleSubmit = async () => {
@@ -85,16 +91,24 @@ const ListeningQuestion = forwardRef(function ListeningQuestion({ onComplete, se
         setIsSubmitting(true);
 
         try {
-            const calculatedScore = calculateScore();
+            const { correctCount, finalScore } = calculateScore();
+            transform((currentData) => ({
+                ...currentData,
+                score: finalScore,
+                correctCount,
+                totalQuestions: flatQuestions.length,
+            }));
 
-            // Update score in form data
-            setData('score', calculatedScore);
-
-            // Submit to backend
-            post('/submit-test');
-
-            // Call onComplete to move to next section
-            onComplete();
+            post('/submit-test', {
+                preserveState: true,
+                onSuccess: () => {
+                    onComplete();
+                },
+                onFinish: () => {
+                    transform((currentData) => currentData);
+                    setIsSubmitting(false);
+                },
+            });
         } catch (error) {
             console.error('Error submitting test:', error);
             setIsSubmitting(false);
@@ -168,7 +182,36 @@ const ListeningQuestion = forwardRef(function ListeningQuestion({ onComplete, se
 
                 {/* Audio Player */}
                 <div className="rounded-lg bg-gray-50 p-6">
-                    <TextToSpeech text={(currentListening as any).audioScript} />
+                    {(currentListening as any).audio_url ? (
+                        <div className="space-y-3">
+                            <audio
+                                ref={audioRef}
+                                key={currentListening.id}
+                                src={(currentListening as any).audio_url}
+                                controls
+                                controlsList="nodownload"
+                                className="w-full"
+                                onEnded={() =>
+                                    setPlayedPassages((prev) => new Set(prev).add(currentListening.id))
+                                }
+                                onPlay={() => {
+                                    if (playedPassages.has(currentListening.id)) {
+                                        if (audioRef.current) {
+                                            audioRef.current.pause();
+                                            audioRef.current.currentTime = 0;
+                                        }
+                                    }
+                                }}
+                            />
+                            {playedPassages.has(currentListening.id) && (
+                                <p className="text-xs text-center text-red-600 font-medium">
+                                    Audio has been played. You may not replay it.
+                                </p>
+                            )}
+                        </div>
+                    ) : (
+                        <p className="text-sm text-center text-gray-500 italic">No audio available for this passage.</p>
+                    )}
                 </div>
             </div>
 

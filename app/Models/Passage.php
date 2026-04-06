@@ -10,6 +10,7 @@ class Passage extends Model
         'subtest_id',
         'title',
         'content',
+        'audio_url',
         'type',
         'order',
     ];

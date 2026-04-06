@@ -1,0 +1,16 @@
+.git
+.github
+.vscode
+node_modules
+vendor
+storage/logs
+storage/framework/cache
+storage/framework/sessions
+storage/framework/testing
+storage/framework/views
+bootstrap/cache/*.php
+.env
+docker-compose.override.yml
+flask-openai-whisper/venv
+flask-openai-whisper/__pycache__
+flask-openai-whisper/uploads

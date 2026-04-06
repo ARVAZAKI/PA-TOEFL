@@ -7,10 +7,12 @@ import { forwardRef, useImperativeHandle, useState } from 'react';
 import NavigatorBox from '../layouts/navigator-question';
 
 const ReadingQuestion = forwardRef(function ReadingQuestion({ onComplete, section, questions }: Props, ref) {
-    const { data, setData, post } = useForm({
+    const { data, setData, post, transform } = useForm({
         answers: {} as Record<number, string>,
         currentQuestionIndex: 0,
         score: 0,
+        correctCount: 0,
+        totalQuestions: 0,
         section: section,
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -65,7 +67,7 @@ const ReadingQuestion = forwardRef(function ReadingQuestion({ onComplete, sectio
     const answeredCount = Object.keys(data.answers).length;
 
     const handleSubmit = () => {
-        let score = 0;
+        let correctCount = 0;
         // const unansweredQuestions = flatQuestions.filter((q) => !data.answers[q.id]);
         // if (unansweredQuestions.length > 0) {
         //     const confirmed = confirm(`You have ${unansweredQuestions.length} unanswered questions. Do you want to submit anyway?`);
@@ -78,20 +80,30 @@ const ReadingQuestion = forwardRef(function ReadingQuestion({ onComplete, sectio
             const userAnswer = data.answers[q.id];
             const correctAnswer = q.correctAnswer;
             if (userAnswer?.trim().toUpperCase() === correctAnswer?.trim().toUpperCase()) {
-                score++;
+                correctCount++;
             }
         });
 
-        const finalScore = Math.round((score / flatQuestions.length) * 30);
-        console.log(`Reading Score: ${finalScore} (${score}/${flatQuestions.length})`);
+        const finalScore = Math.round((correctCount / flatQuestions.length) * 30);
+        console.log(`Reading Score: ${finalScore} (${correctCount}/${flatQuestions.length})`);
 
-        setData('score', finalScore);
+        transform((currentData) => ({
+            ...currentData,
+            score: finalScore,
+            correctCount,
+            totalQuestions: flatQuestions.length,
+        }));
 
-        post('/submit-test');
-
-        onComplete();
-
-        setIsSubmitting(false);
+        post('/submit-test', {
+            preserveState: true,
+            onSuccess: () => {
+                onComplete();
+            },
+            onFinish: () => {
+                transform((currentData) => currentData);
+                setIsSubmitting(false);
+            },
+        });
     };
 
     useImperativeHandle(ref, () => ({

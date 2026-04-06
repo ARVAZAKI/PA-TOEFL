@@ -7,6 +7,20 @@ import { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
 import NavigatorBox from '../layouts/navigator-question';
 import SubmissionLoading from '../utils/SubmissionLoading';
 
+const AI_API_URL = import.meta.env.VITE_AI_API_URL ?? 'http://127.0.0.1:5000';
+const AI_REQUEST_TIMEOUT_MS = 6000;
+
+const getFallbackWritingScore = (answer: string) => {
+    const wordCount = answer.split(/\s+/).filter((word) => word.length > 0).length;
+
+    if (wordCount >= 250) return 24;
+    if (wordCount >= 180) return 20;
+    if (wordCount >= 120) return 16;
+    if (wordCount >= 80) return 12;
+
+    return 6;
+};
+
 const WritingQuestion = forwardRef(function WritingQuestion({ onComplete, section, questions }: Props, ref) {
     const { data, setData, post } = useForm({
         answers: {} as Record<number, string>,
@@ -99,61 +113,45 @@ const WritingQuestion = forwardRef(function WritingQuestion({ onComplete, sectio
                 return;
             }
 
-            let totalScore = 0;
+            const scores = await Promise.all(
+                answeredQuestions.map(async (q: any) => {
+                    const answer = data.answers[q.id]?.trim();
+                    if (!answer) return 0;
 
-            // For writing section, we'll use a simple scoring method
-            // If API is not available, use word count and basic validation
-            for (const q of answeredQuestions) {
-                const answer = data.answers[(q as any).id]?.trim();
-                if (!answer) continue;
-
-                try {
-                    // Try to call the API first
                     const payload = {
-                        question: (q as any).question,
-                        answer: answer,
+                        question: q.question,
+                        answer,
                     };
 
-                    const response = await fetch('http://127.0.0.1:5000/assess-writing', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify(payload),
-                    });
+                    const controller = new AbortController();
+                    const timeoutId = window.setTimeout(() => controller.abort(), AI_REQUEST_TIMEOUT_MS);
 
-                    if (response.ok) {
+                    try {
+                        const response = await fetch(`${AI_API_URL}/assess-writing`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify(payload),
+                            signal: controller.signal,
+                        });
+
+                        if (!response.ok) {
+                            return getFallbackWritingScore(answer);
+                        }
+
                         const result = await response.json();
-                        const score = Number(result.assessment?.score || 0);
-                        totalScore += Math.min(score, 30); // Cap at 30
-                    } else {
-                        // Fallback scoring based on word count and basic criteria
-                        const wordCount = answer.split(/\s+/).length;
-                        let score = 0;
-
-                        if (wordCount >= 400) score = 25;
-                        else if (wordCount >= 300) score = 20;
-                        else if (wordCount >= 200) score = 15;
-                        else if (wordCount >= 100) score = 10;
-                        else score = 5;
-
-                        totalScore += score;
+                        return Math.min(Number(result.assessment?.score || 0), 30);
+                    } catch (error) {
+                        console.error(`Error processing question ${q.id}:`, error);
+                        return getFallbackWritingScore(answer);
+                    } finally {
+                        window.clearTimeout(timeoutId);
                     }
-                } catch (error) {
-                    console.error(`Error processing question ${(q as any).id}:`, error);
-                    // Fallback scoring
-                    const wordCount = answer.split(/\s+/).length;
-                    let score = 0;
+                }),
+            );
 
-                    if (wordCount >= 400) score = 25;
-                    else if (wordCount >= 300) score = 20;
-                    else if (wordCount >= 200) score = 15;
-                    else if (wordCount >= 100) score = 10;
-                    else score = 5;
-
-                    totalScore += score;
-                }
-            }
+            const totalScore = scores.reduce((sum, score) => sum + score, 0);
 
             // Calculate average score if multiple questions
             const finalScore = answeredQuestions.length > 0 ? Math.round(totalScore / answeredQuestions.length) : 0;

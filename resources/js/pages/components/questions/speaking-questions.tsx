@@ -6,6 +6,9 @@ import { CheckCircle, Flag, FlagOff, Mic, MicOff, Play, Square } from 'lucide-re
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import NavigatorBox from '../layouts/navigator-question';
 
+const AI_API_URL = import.meta.env.VITE_AI_API_URL ?? 'http://127.0.0.1:5000';
+const AI_REQUEST_TIMEOUT_MS = 20000;
+
 // Enhanced Speaking Recorder Component with auto-submit
 const SpeakingRecorder = ({
     onSave,
@@ -380,10 +383,16 @@ const SpeakingQuestion = forwardRef(function SpeakingQuestion({ onComplete, sect
             formData.append('audio', blob, 'recording.wav');
             formData.append('question', currentQuestion.question);
 
-            const response = await fetch('http://127.0.0.1:5000/assess-speaking', {
+            const controller = new AbortController();
+            const timeoutId = window.setTimeout(() => controller.abort(), AI_REQUEST_TIMEOUT_MS);
+
+            const response = await fetch(`${AI_API_URL}/assess-speaking`, {
                 method: 'POST',
                 body: formData,
+                signal: controller.signal,
             });
+
+            window.clearTimeout(timeoutId);
 
             const result = await response.json();
 
@@ -409,7 +418,11 @@ const SpeakingQuestion = forwardRef(function SpeakingQuestion({ onComplete, sect
             }
         } catch (error) {
             console.error('Error sending audio:', error);
-            alert('Failed to connect to the assessment server.');
+            if (error instanceof DOMException && error.name === 'AbortError') {
+                alert('Audio assessment timed out. Please try again.');
+            } else {
+                alert('Failed to connect to the assessment server.');
+            }
         } finally {
             setProcessingQuestions((prev) => {
                 const newSet = new Set(prev);

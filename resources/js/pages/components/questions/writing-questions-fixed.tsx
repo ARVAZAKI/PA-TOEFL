@@ -6,6 +6,8 @@ import { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
 import NavigatorBox from '../layouts/navigator-question';
 import SubmissionLoading from '../utils/SubmissionLoading';
 
+const AI_API_URL = import.meta.env.VITE_AI_API_URL ?? 'http://127.0.0.1:5000';
+
 const WritingQuestion = forwardRef(function WritingQuestion({ onComplete, section, questions }: Props, ref) {
     const { data, setData, post } = useForm({
         answers: {} as Record<number, string>,
@@ -92,7 +94,7 @@ const WritingQuestion = forwardRef(function WritingQuestion({ onComplete, sectio
                         answer: answer,
                     };
 
-                    const response = await fetch('http://127.0.0.1:5000/assess-writing', {
+                    const response = await fetch(`${AI_API_URL}/assess-writing`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',

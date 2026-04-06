@@ -3,22 +3,18 @@
 namespace App\Http\Controllers;
 use Inertia\Inertia;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use App\Models\Subtest;
+use App\Models\Passage;
+use App\Models\Question;
 
 class TestUnitController extends Controller
 {
-    public function ThrowSession(Request $request)
-    {
-        $username = $request->input('username');
-        session(['username' => $username]);
-
-        return redirect()->route('test.show', ['section' => 'general']);
-    }
-
-
     public function subtestShow($section = 'general')
     {
-
-        $username = session('username');
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+        $username = $user->name;
         $readingScore = session('ReadingScore', 0);
         $listeningScore = session('ListeningScore', 0);
         $speakingScore = session('SpeakingScore', 0);
@@ -69,15 +65,21 @@ class TestUnitController extends Controller
     {
         $section = $request->input('section');
         $score = $request->input('score'); // jawaban user
+        $correctCount = $request->input('correctCount');
+        $totalQuestions = $request->input('totalQuestions');
 
         switch ($section) {
             case "reading-question":
                 session(['ReadingScore' => $score]);
                 session(['AnsweredCountReading' => true]);
+                session(['ReadingCorrectCount' => $correctCount]);
+                session(['ReadingTotalQuestions' => $totalQuestions]);
                 break;
             case "listening-question":
                 session(['ListeningScore' => $score]);
                 session(['AnsweredCountListening' => true]);
+                session(['ListeningCorrectCount' => $correctCount]);
+                session(['ListeningTotalQuestions' => $totalQuestions]);
                 break;
             case "speaking-question":
                 session(['SpeakingScore' => $score]);
@@ -101,7 +103,11 @@ class TestUnitController extends Controller
             'AnsweredCountReading',
             'AnsweredCountListening',
             'AnsweredCountSpeaking',
-            'AnsweredCountWriting'
+            'AnsweredCountWriting',
+            'ReadingCorrectCount',
+            'ReadingTotalQuestions',
+            'ListeningCorrectCount',
+            'ListeningTotalQuestions',
         ]);
 
         return redirect()->route('home');
@@ -113,18 +119,61 @@ class TestUnitController extends Controller
         $listeningScore = session('ListeningScore', 0);
         $speakingScore = session('SpeakingScore', 0);
         $writingScore = session('WritingScore', 0);
-        $username = session('username');
+        $readingCorrectCount = session('ReadingCorrectCount');
+        $readingTotalQuestions = session('ReadingTotalQuestions');
+        $listeningCorrectCount = session('ListeningCorrectCount');
+        $listeningTotalQuestions = session('ListeningTotalQuestions');
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+        $username = $user->name;
 
         return Inertia::render('scoreboard', [
             'readingScore' => $readingScore,
             'listeningScore' => $listeningScore,
             'speakingScore' => $speakingScore,
             'writingScore' => $writingScore,
-            'username' => $username
+            'readingCorrectCount' => $readingCorrectCount,
+            'readingTotalQuestions' => $readingTotalQuestions,
+            'listeningCorrectCount' => $listeningCorrectCount,
+            'listeningTotalQuestions' => $listeningTotalQuestions,
+            'username' => $username,
         ]);
     }
 
     private function getReadingQuestions()
+    {
+        $subtest = Subtest::where('name', 'Reading')->first();
+
+        if ($subtest) {
+            $passages = Passage::where('subtest_id', $subtest->id)
+                ->with(['questions.choices'])
+                ->orderBy('order')
+                ->get();
+
+            if ($passages->isNotEmpty()) {
+                return $passages->map(function ($passage) {
+                    return [
+                        'id' => $passage->id,
+                        'title' => $passage->title,
+                        'passage' => $passage->content,
+                        'questions' => $passage->questions->map(function ($q) {
+                            $correctChoice = $q->choices->firstWhere('is_correct', true);
+                            return [
+                                'id' => $q->id,
+                                'question' => $q->question_text,
+                                'choices' => $q->choices->pluck('choice_text')->toArray(),
+                                'correctAnswer' => $correctChoice ? $correctChoice->choice_text : '',
+                            ];
+                        })->toArray(),
+                    ];
+                })->toArray();
+            }
+        }
+
+        return $this->getHardcodedReadingQuestions();
+    }
+
+    private function getHardcodedReadingQuestions()
     {
         return [
             [
@@ -266,14 +315,48 @@ The influence of jazz extended far beyond music itself. It played a crucial role
         ];
     }
 
-
     private function getListeningQuestions()
+    {
+        $subtest = Subtest::where('name', 'Listening')->first();
+
+        if ($subtest) {
+            $passages = Passage::where('subtest_id', $subtest->id)
+                ->with(['questions.choices'])
+                ->orderBy('order')
+                ->get();
+
+            if ($passages->isNotEmpty()) {
+                return $passages->map(function ($passage) {
+                    return [
+                        'id' => $passage->id,
+                        'title' => $passage->title,
+                        'type' => $passage->type === 'listening' ? 'lecture' : $passage->type,
+                        'audio_url' => $passage->audio_url ? \Illuminate\Support\Facades\Storage::url($passage->audio_url) : null,
+                        'questions' => $passage->questions->map(function ($q) {
+                            $correctChoice = $q->choices->firstWhere('is_correct', true);
+                            return [
+                                'id' => $q->id,
+                                'question' => $q->question_text,
+                                'choices' => $q->choices->pluck('choice_text')->toArray(),
+                                'correctAnswer' => $correctChoice ? $correctChoice->choice_text : '',
+                            ];
+                        })->toArray(),
+                    ];
+                })->toArray();
+            }
+        }
+
+        return $this->getHardcodedListeningQuestions();
+    }
+
+    private function getHardcodedListeningQuestions()
     {
         return [
             [
                 'id' => 1,
                 'title' => 'Conversation: Student and Academic Advisor',
                 'type' => 'conversation',
+                'audio_url' => null,
                 'audioScript' => 'Student: Hi, Professor Johnson. Thanks for meeting with me. I\'m having some trouble deciding on my major.
 
 Advisor: Of course, that\'s what I\'m here for. What\'s your current situation?
@@ -344,6 +427,7 @@ Advisor: That\'s true, but those skills are valuable in any field. Research and 
                 'id' => 2,
                 'title' => 'Academic Lecture: Art History - Impressionism',
                 'type' => 'lecture',
+                'audio_url' => null,
                 'audioScript' => 'Professor: Today we\'re going to discuss Impressionism, one of the most revolutionary movements in art history. Impressionism emerged in France during the 1860s and 1870s, representing a dramatic break from traditional academic painting.
 
 The term "Impressionism" actually came from a critic who was mocking the movement. He saw Claude Monet\'s painting "Impression, Sunrise" and used the title disparagingly to describe what he saw as unfinished, sloppy work. However, the artists embraced this term.
@@ -404,7 +488,37 @@ The movement faced significant resistance from the established art world. The of
             ]
         ];
     }
+
     private function getSpeakingQuestions()
+    {
+        $subtest = Subtest::where('name', 'Speaking')->first();
+
+        if ($subtest) {
+            $questions = Question::where('subtest_id', $subtest->id)
+                ->whereNull('passage_id')
+                ->orderBy('order')
+                ->get();
+
+            if ($questions->isNotEmpty()) {
+                // Return array of speaking questions
+                return $questions->map(function ($q, $index) {
+                    return [
+                        'id' => $q->id,
+                        'title' => "Speaking Task " . ($index + 1),
+                        'type' => str_contains($q->question_type, 'speaking') ? 'independent' : $q->question_type,
+                        'preparationTime' => $q->preparation_time ?? 15,
+                        'responseTime' => $q->response_time ?? 45,
+                        'question' => $q->question_text,
+                        'tips' => [],
+                    ];
+                })->first(); // Speaking component expects single object (not array)
+            }
+        }
+
+        return $this->getHardcodedSpeakingQuestions();
+    }
+
+    private function getHardcodedSpeakingQuestions()
     {
         return [
             'id' => 1,
@@ -423,7 +537,46 @@ The movement faced significant resistance from the established art world. The of
             ]
         ];
     }
+
     private function getWritingQuestions()
+    {
+        $subtest = Subtest::where('name', 'Writing')->first();
+
+        if ($subtest) {
+            $questions = Question::where('subtest_id', $subtest->id)
+                ->whereNull('passage_id')
+                ->orderBy('order')
+                ->get();
+
+            if ($questions->isNotEmpty()) {
+                $q = $questions->first();
+                return [
+                    'id' => $q->id,
+                    'title' => 'Academic Discussion Writing Task',
+                    'type' => 'discussion',
+                    'timeLimit' => 10,
+                    'wordCount' => 'At least 100 words',
+                    'context' => '',
+                    'passage' => '',
+                    'question' => [
+                        'id' => $q->id,
+                        'question' => $q->question_text,
+                    ],
+                    'instructions' => [
+                        'You have 10 minutes to write your response',
+                        'Your response should be at least 100 words',
+                        'Take a clear position and support it with reasons',
+                        'Use specific examples to support your argument',
+                        'Write in an academic discussion style',
+                    ],
+                ];
+            }
+        }
+
+        return $this->getHardcodedWritingQuestions();
+    }
+
+    private function getHardcodedWritingQuestions()
     {
         return [
             'id' => 1,

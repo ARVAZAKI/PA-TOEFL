@@ -1,21 +1,9 @@
 import { Button } from '@/components/ui/button';
 import { type SharedData } from '@/types';
-import { Head, useForm, usePage, Link } from '@inertiajs/react';
+import { Head, usePage, Link } from '@inertiajs/react';
 
 export default function Welcome() {
-    const { data, setData, post } = useForm({
-        username: '',
-    });
     const { auth } = usePage<SharedData>().props;
-
-    const handleSubmit = (e: any) => {
-        e.preventDefault();
-        if (!data.username.trim()) {
-            alert('Please enter your name');
-            return;
-        }
-        post('/submit-session');
-    };
 
     return (
         <>
@@ -32,12 +20,12 @@ export default function Welcome() {
                     }} />
                 </div>
 
-                {/* Login Link - Top Right */}
+                {/* Top Right Nav */}
                 <div className="absolute top-6 right-6 z-20">
                     {auth.user ? (
-                        <Link href={auth.user.role === 'admin' ? '/admin/dashboard' : '/dashboard'}>
+                        <Link href={(auth.user as any).role === 'admin' ? '/admin/dashboard' : '/dashboard'}>
                             <Button variant="outline" className="bg-white/80 backdrop-blur-sm">
-                                Go to Dashboard
+                                Dashboard
                             </Button>
                         </Link>
                     ) : (
@@ -45,11 +33,6 @@ export default function Welcome() {
                             <Link href="/login">
                                 <Button variant="outline" className="bg-white/80 backdrop-blur-sm">
                                     Login
-                                </Button>
-                            </Link>
-                            <Link href="/register">
-                                <Button className="bg-gradient-to-r from-blue-600 to-indigo-600">
-                                    Register
                                 </Button>
                             </Link>
                         </div>
@@ -65,63 +48,59 @@ export default function Welcome() {
                     <div className="relative bg-white/80 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/20 p-8">
                         {/* Header Section */}
                         <div className="text-center mb-8">
-                            {/* Icon */}
                             <div className="mx-auto w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center mb-4 shadow-lg">
                                 <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                                 </svg>
                             </div>
                             
-                            {/* Title */}
                             <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent mb-2">
                                 Welcome to TOEFL Test
                             </h1>
                             <p className="text-gray-600 text-sm font-medium">
-                                Enter your name to begin your assessment
+                                {auth.user
+                                    ? `Hello, ${auth.user.name}! Ready to start your assessment?`
+                                    : 'Please login to begin your assessment'}
                             </p>
                         </div>
 
-                        {/* Form Section */}
-                        <form onSubmit={handleSubmit} className="space-y-6">
-                            <div className="space-y-2">
-                                <label 
-                                    htmlFor="username" 
-                                    className="block text-sm font-semibold text-gray-700"
-                                >
-                                    Full Name
-                                </label>
-                                <div className="relative">
-                                    <input
-                                        type="text"
-                                        name="username"
-                                        id="username"
-                                        value={data.username}
-                                        onChange={(e) => setData('username', e.target.value)}
-                                        placeholder="Enter your full name..."
-                                        className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white/50 backdrop-blur-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:bg-white/70"
-                                        required
-                                    />
-                                    {/* Input icon */}
-                                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                                        <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                        </svg>
+                        {/* Action Section */}
+                        {auth.user ? (
+                            <div className="space-y-4">
+                                <Link href="/test/general" className="block">
+                                    <Button className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold py-3 px-6 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200">
+                                        <div className="flex items-center justify-center space-x-2">
+                                            <span>Start Test</span>
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                                            </svg>
+                                        </div>
+                                    </Button>
+                                </Link>
+                                <div className="grid grid-cols-2 gap-2 text-center text-xs text-gray-500">
+                                    <div className="bg-blue-50 rounded-lg p-2">
+                                        <div className="font-semibold text-blue-700">4 Sections</div>
+                                        <div>Reading · Listening · Speaking · Writing</div>
+                                    </div>
+                                    <div className="bg-indigo-50 rounded-lg p-2">
+                                        <div className="font-semibold text-indigo-700">Timed Test</div>
+                                        <div>5 minutes per section</div>
                                     </div>
                                 </div>
                             </div>
-
-                            <Button 
-                                type="submit"
-                                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold py-3 px-6 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                            >
-                                <div className="flex items-center justify-center space-x-2">
-                                    <span>Start Test</span>
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                                    </svg>
+                        ) : (
+                            <div className="space-y-4">
+                                <Link href="/login" className="block">
+                                    <Button className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold py-3 px-6 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200">
+                                        Login to Start Test
+                                    </Button>
+                                </Link>
+                                <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+                                    <p className="font-semibold">Testing note</p>
+                                    <p className="mt-1">Questions are still dummy content for trial runs. Please log in with student@toefl.com to test the student flow.</p>
                                 </div>
-                            </Button>
-                        </form>
+                            </div>
+                        )}
 
                         {/* Footer */}
                         <div className="mt-8 pt-6 border-t border-gray-200/50">

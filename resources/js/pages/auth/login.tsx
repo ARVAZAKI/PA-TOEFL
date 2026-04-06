@@ -3,7 +3,6 @@ import { LoaderCircle, BookOpen } from 'lucide-react';
 import { FormEventHandler } from 'react';
 
 import InputError from '@/components/input-error';
-import TextLink from '@/components/text-link';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -67,9 +66,9 @@ export default function Login({ status, canResetPassword }: LoginProps) {
                         <div className="flex items-center">
                             <Label htmlFor="password">Password</Label>
                             {canResetPassword && (
-                                <TextLink href={route('password.request')} className="ml-auto text-sm" tabIndex={5}>
+                                <a href={route('password.request')} className="ml-auto text-sm text-primary underline-offset-4 hover:underline" tabIndex={5}>
                                     Forgot password?
-                                </TextLink>
+                                </a>
                             )}
                         </div>
                         <Input
@@ -101,34 +100,17 @@ export default function Login({ status, canResetPassword }: LoginProps) {
                         Log in
                     </Button>
                 </div>
-
-                <div className="text-muted-foreground text-center text-sm">
-                    Don't have an account?{' '}
-                    <TextLink href={route('register')} tabIndex={5}>
-                        Sign up
-                    </TextLink>
-                </div>
             </form>
 
-            {/* Demo Accounts Info */}
             <div className="mt-6 rounded-lg border border-blue-200 bg-blue-50 p-4">
                 <div className="flex items-start gap-3">
                     <BookOpen className="h-5 w-5 text-blue-600 mt-0.5" />
                     <div className="flex-1">
-                        <h4 className="font-semibold text-sm text-blue-900 mb-2">Demo Accounts</h4>
-                        <div className="space-y-2 text-xs text-blue-700">
-                            <div className="grid grid-cols-2 gap-2">
-                                <div>
-                                    <p className="font-medium">Admin Access:</p>
-                                    <p>📧 admin@toefl.com</p>
-                                    <p>🔑 password</p>
-                                </div>
-                                <div>
-                                    <p className="font-medium">Student Access:</p>
-                                    <p>📧 student@toefl.com</p>
-                                    <p>🔑 password</p>
-                                </div>
-                            </div>
+                        <h4 className="mb-2 text-sm font-semibold text-blue-900">Testing Note</h4>
+                        <div className="space-y-1 text-xs text-blue-700">
+                            <p>This is a trial test for the final project and does not use the original TOEFL questions yet.</p>
+                            <p>email: student@toefl.com</p>
+                            <p>password: password</p>
                         </div>
                     </div>
                 </div>

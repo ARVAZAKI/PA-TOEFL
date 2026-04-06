@@ -1,0 +1,92 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: pa-toefl-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: pa_toefl
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d pa_toefl"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  flask-ai:
+    build:
+      context: .
+      dockerfile: docker/flask/Dockerfile
+    container_name: pa-toefl-flask-ai
+    restart: unless-stopped
+    env_file:
+      - ./flask-openai-whisper/.env
+    environment:
+      FLASK_HOST: 0.0.0.0
+      FLASK_PORT: 5000
+      FLASK_DEBUG: "false"
+    ports:
+      - "5000:5000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/health')"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+
+  laravel-app:
+    build:
+      context: .
+      dockerfile: docker/laravel/Dockerfile
+      args:
+        VITE_AI_API_URL: http://localhost:5000
+    container_name: pa-toefl-laravel
+    command: >
+      sh -lc '
+      cd /var/www/html &&
+      echo "Waiting for PostgreSQL at $${DB_HOST}:$${DB_PORT}..." &&
+      until pg_isready -h "$${DB_HOST}" -p "$${DB_PORT}" -U "$${DB_USERNAME}" >/dev/null 2>&1; do sleep 2; done &&
+      if [ ! -f .env ] && [ -f .env.example ]; then cp .env.example .env; fi &&
+      sed -i "/^APP_URL=/d;/^VITE_APP_URL=/d;/^VITE_AI_API_URL=/d;/^DB_CONNECTION=/d;/^DB_HOST=/d;/^DB_PORT=/d;/^DB_DATABASE=/d;/^DB_USERNAME=/d;/^DB_PASSWORD=/d;/^SESSION_DRIVER=/d;/^CACHE_STORE=/d;/^FILESYSTEM_DISK=/d;/^QUEUE_CONNECTION=/d;" .env &&
+      printf "APP_URL=%s\nVITE_APP_URL=%s\nVITE_AI_API_URL=%s\nDB_CONNECTION=%s\nDB_HOST=%s\nDB_PORT=%s\nDB_DATABASE=%s\nDB_USERNAME=%s\nDB_PASSWORD=%s\nSESSION_DRIVER=%s\nCACHE_STORE=%s\nFILESYSTEM_DISK=%s\nQUEUE_CONNECTION=%s\n" \
+      "$${APP_URL}" "$${VITE_APP_URL}" "$${VITE_AI_API_URL}" "$${DB_CONNECTION}" "$${DB_HOST}" "$${DB_PORT}" "$${DB_DATABASE}" "$${DB_USERNAME}" "$${DB_PASSWORD}" "$${SESSION_DRIVER}" "$${CACHE_STORE}" "$${FILESYSTEM_DISK}" "$${QUEUE_CONNECTION}" >> .env &&
+      if ! grep -q "^APP_KEY=base64:" .env; then php artisan key:generate --force; fi &&
+      unset APP_KEY &&
+      mkdir -p storage/framework/views storage/framework/cache storage/framework/sessions bootstrap/cache &&
+      rm -f bootstrap/cache/*.php &&
+      php artisan storage:link || true &&
+      php artisan migrate --force &&
+      php artisan db:seed --force &&
+      php artisan serve --host=0.0.0.0 --port=8000
+      '
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      flask-ai:
+        condition: service_healthy
+    environment:
+      APP_NAME: TOEFL
+      APP_ENV: local
+      APP_DEBUG: "true"
+      APP_URL: http://localhost:8000
+      VITE_APP_URL: http://localhost:8000
+      VITE_AI_API_URL: http://localhost:5000
+      LOG_CHANNEL: stack
+      LOG_LEVEL: debug
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_DATABASE: pa_toefl
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+      SESSION_DRIVER: file
+      CACHE_STORE: file
+      QUEUE_CONNECTION: database
+      FILESYSTEM_DISK: public
+    ports:
+      - "8000:8000"
+
+volumes:
+  postgres_data:

@@ -11,12 +11,25 @@ interface ScoreData {
     listeningScore: number;
     speakingScore: number;
     writingScore: number;
+    readingCorrectCount?: number;
+    readingTotalQuestions?: number;
+    listeningCorrectCount?: number;
+    listeningTotalQuestions?: number;
 }
 
 export default function Scoreboard() {
-    const { auth } = usePage<SharedData>().props;
     const { props } = usePage();
-    const { username, readingScore = 0, listeningScore = 0, speakingScore = 0, writingScore = 0 } = props as unknown as ScoreData;
+    const {
+        username,
+        readingScore = 0,
+        listeningScore = 0,
+        speakingScore = 0,
+        writingScore = 0,
+        readingCorrectCount,
+        readingTotalQuestions,
+        listeningCorrectCount,
+        listeningTotalQuestions,
+    } = props as unknown as ScoreData;
 
     const [isGenerating, setIsGenerating] = useState(false);
 
@@ -243,8 +256,22 @@ export default function Scoreboard() {
     };
 
     const sections = [
-        { name: 'Reading', score: readingScore, icon: BookOpen, color: 'blue' },
-        { name: 'Listening', score: listeningScore, icon: TrendingUp, color: 'green' },
+        {
+            name: 'Reading',
+            score: readingScore,
+            icon: BookOpen,
+            color: 'blue',
+            correctCount: readingCorrectCount,
+            totalQuestions: readingTotalQuestions,
+        },
+        {
+            name: 'Listening',
+            score: listeningScore,
+            icon: TrendingUp,
+            color: 'green',
+            correctCount: listeningCorrectCount,
+            totalQuestions: listeningTotalQuestions,
+        },
         { name: 'Speaking', score: speakingScore, icon: BarChart3, color: 'purple' },
         { name: 'Writing', score: writingScore, icon: Award, color: 'orange' },
     ];
@@ -310,6 +337,17 @@ export default function Scoreboard() {
                             </CardContent>
                         </Card>
 
+                        <Card className="border-l-4 border-l-blue-500 bg-blue-50">
+                            <CardContent className="pt-6">
+                                <div className="space-y-2">
+                                    <h3 className="font-semibold text-blue-900">Dummy test note</h3>
+                                    <p className="text-sm text-blue-800">
+                                        The current questions are still dummy content for testing. Use the correct-answer counts below as a quick validation of your practice run.
+                                    </p>
+                                </div>
+                            </CardContent>
+                        </Card>
+
                         {/* Section Scores Grid */}
                         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                             {sections.map((section) => {
@@ -351,6 +389,11 @@ export default function Scoreboard() {
                                                 >
                                                     {level.level}
                                                 </div>
+                                                {typeof section.correctCount === 'number' && typeof section.totalQuestions === 'number' && (
+                                                    <div className="rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600">
+                                                        Correct answers: <span className="font-semibold text-gray-800">{section.correctCount}</span> / {section.totalQuestions}
+                                                    </div>
+                                                )}
                                             </div>
                                         </CardContent>
                                     </Card>
