@@ -354,135 +354,120 @@ The influence of jazz extended far beyond music itself. It played a crucial role
         return [
             [
                 'id' => 1,
-                'title' => 'Conversation: Student and Academic Advisor',
+                'title' => 'Conversation: Lactose Intolerance Story',
                 'type' => 'conversation',
-                'audio_url' => null,
-                'audioScript' => 'Student: Hi, Professor Johnson. Thanks for meeting with me. I\'m having some trouble deciding on my major.
-
-Advisor: Of course, that\'s what I\'m here for. What\'s your current situation?
-
-Student: Well, I\'m a sophomore, and I\'ve been taking general education courses, but I need to declare a major soon. I\'m torn between psychology and business administration.
-
-Advisor: Those are quite different fields. What draws you to each one?
-
-Student: I\'ve always been interested in understanding how people think and behave, which is why psychology appeals to me. But I\'m also practical about my future - I want to make sure I can find a good job after graduation, and business seems more secure financially.
-
-Advisor: That\'s a common concern. Have you considered that psychology can lead to many career paths? You could work in human resources, marketing research, counseling, or even pursue graduate studies.
-
-Student: I hadn\'t thought about marketing research. How does psychology relate to that?
-
-Advisor: Companies need to understand consumer behavior to develop effective marketing strategies. Psychology majors often work for advertising agencies or corporate marketing departments. The starting salaries can be quite competitive.
-
-Student: That sounds interesting. But what about the coursework? I\'ve heard psychology requires a lot of statistics and research methods.
-
-Advisor: That\'s true, but those skills are valuable in any field. Research and analytical skills are highly sought after by employers. Plus, if you find you enjoy research, you could consider graduate school.',
+                'audio_url' => asset('listening.mpeg'),
+                'audioScript' => 'A speaker tells an embarrassing story about being lactose intolerant after drinking an M&M milkshake before visiting a client\'s house. Her husband had warned her about dairy products. While at the client\'s house, her stomach reacted badly, so she went to the bathroom. The situation became more embarrassing because people were waiting outside. Inside the bathroom she made a loud fart, and after the noise there was complete silence. When she came out, she simply said thank you. At the end of the story, someone entered the bathroom and reacted to what happened.',
                 'questions' => [
                     [
                         'id' => 1,
-                        'question' => 'What is the student\'s main concern about choosing a major?',
+                        'question' => 'What is the main problem the speaker has?',
                         'choices' => [
-                            'She is not interested in any particular field',
-                            'She wants to balance personal interest with career prospects',
-                            'She does not have enough time to decide',
-                            'She is not performing well in her current courses'
+                            'She hates milkshakes',
+                            'She is lactose intolerant',
+                            'She is allergic to chocolate',
+                            'She dislikes visiting people'
                         ],
-                        'correctAnswer' => 'She wants to balance personal interest with career prospects'
+                        'correctAnswer' => 'She is lactose intolerant'
                     ],
                     [
                         'id' => 2,
-                        'question' => 'According to the advisor, what career path combines psychology with business?',
+                        'question' => 'What did the speaker consume before feeling sick?',
                         'choices' => [
-                            'Human resources',
-                            'Marketing research',
-                            'Corporate consulting',
-                            'Graduate school teaching'
+                            'Ice cream',
+                            'Cheese cake',
+                            'M&M milkshake',
+                            'Chocolate bar'
                         ],
-                        'correctAnswer' => 'Marketing research'
+                        'correctAnswer' => 'M&M milkshake'
                     ],
                     [
                         'id' => 3,
-                        'question' => 'What does the advisor say about psychology coursework?',
+                        'question' => 'Who warned the speaker about consuming dairy products?',
                         'choices' => [
-                            'It is easier than business courses',
-                            'It focuses mainly on theory',
-                            'It develops valuable analytical skills',
-                            'It requires no mathematical background'
+                            'Her mother',
+                            'Her friend',
+                            'Her husband',
+                            'Her doctor'
                         ],
-                        'correctAnswer' => 'It develops valuable analytical skills'
+                        'correctAnswer' => 'Her husband'
                     ],
                     [
                         'id' => 4,
-                        'question' => 'What can be inferred about the student\'s attitude toward statistics?',
+                        'question' => 'Where did the speaker go when her stomach started to react?',
                         'choices' => [
-                            'She enjoys mathematical subjects',
-                            'She is concerned about taking statistics courses',
-                            'She has already completed statistics requirements',
-                            'She prefers statistics to research methods'
+                            'Her own house',
+                            'A public restroom',
+                            'A client\'s house',
+                            'A restaurant'
                         ],
-                        'correctAnswer' => 'She is concerned about taking statistics courses'
-                    ]
-                ]
-            ],
-            [
-                'id' => 2,
-                'title' => 'Academic Lecture: Art History - Impressionism',
-                'type' => 'lecture',
-                'audio_url' => null,
-                'audioScript' => 'Professor: Today we\'re going to discuss Impressionism, one of the most revolutionary movements in art history. Impressionism emerged in France during the 1860s and 1870s, representing a dramatic break from traditional academic painting.
-
-The term "Impressionism" actually came from a critic who was mocking the movement. He saw Claude Monet\'s painting "Impression, Sunrise" and used the title disparagingly to describe what he saw as unfinished, sloppy work. However, the artists embraced this term.
-
-What made Impressionism so revolutionary? First, let\'s talk about their painting technique. Traditional academic painters worked in studios, building up layers of paint to create smooth, detailed surfaces. Impressionists, however, painted outdoors - "en plein air" as they called it. They used loose, visible brushstrokes and often applied paint directly from the tube without mixing it extensively.
-
-The Impressionists were also obsessed with light and how it changes throughout the day. Monet, for example, painted the same haystack or cathedral at different times to capture these changes. This was radical because traditional art focused on timeless, idealized subjects.
-
-Another key aspect was their choice of subject matter. Instead of historical, religious, or mythological scenes preferred by academic artists, Impressionists painted everyday life - people in cafes, dancers, landscapes, and street scenes. They wanted to capture modern life as it was happening.
-
-The movement faced significant resistance from the established art world. The official Paris Salon repeatedly rejected their work, so the Impressionists organized their own independent exhibitions starting in 1874.',
-                'questions' => [
+                        'correctAnswer' => 'A client\'s house'
+                    ],
                     [
                         'id' => 5,
-                        'question' => 'How did the term "Impressionism" originate?',
+                        'question' => 'Why did the speaker go to the bathroom?',
                         'choices' => [
-                            'Artists chose it to describe their technique',
-                            'A critic used it mockingly to describe their work',
-                            'It was named after a famous painting school',
-                            'The French government assigned this classification'
+                            'To wash her hands',
+                            'To fix her makeup',
+                            'To take a shower',
+                            'Because she had stomach issues'
                         ],
-                        'correctAnswer' => 'A critic used it mockingly to describe their work'
+                        'correctAnswer' => 'Because she had stomach issues'
                     ],
                     [
                         'id' => 6,
-                        'question' => 'What does "en plein air" refer to?',
+                        'question' => 'What made the situation more embarrassing?',
                         'choices' => [
-                            'A type of paint mixing technique',
-                            'Painting outdoors rather than in studios',
-                            'A style of brushstroke application',
-                            'A method of preparing canvases'
+                            'The bathroom was broken',
+                            'People were waiting outside',
+                            'She forgot to lock the door',
+                            'She slipped on the floor'
                         ],
-                        'correctAnswer' => 'Painting outdoors rather than in studios'
+                        'correctAnswer' => 'People were waiting outside'
                     ],
                     [
                         'id' => 7,
-                        'question' => 'Why did Monet paint the same subjects multiple times?',
+                        'question' => 'What happened inside the bathroom?',
                         'choices' => [
-                            'To practice and improve his technique',
-                            'To show different artistic styles',
-                            'To capture how light changes throughout the day',
-                            'To meet demand from art collectors'
+                            'She fainted',
+                            'She dropped her phone',
+                            'She made a loud fart',
+                            'She broke something'
                         ],
-                        'correctAnswer' => 'To capture how light changes throughout the day'
+                        'correctAnswer' => 'She made a loud fart'
                     ],
                     [
                         'id' => 8,
-                        'question' => 'What was the Impressionists\' response to rejection by the Paris Salon?',
+                        'question' => 'How did the people outside react after the noise?',
                         'choices' => [
-                            'They changed their painting style to conform',
-                            'They stopped painting altogether',
-                            'They organized their own independent exhibitions',
-                            'They moved to other countries'
+                            'They laughed loudly',
+                            'They ignored it',
+                            'There was silence',
+                            'They knocked on the door'
                         ],
-                        'correctAnswer' => 'They organized their own independent exhibitions'
+                        'correctAnswer' => 'There was silence'
+                    ],
+                    [
+                        'id' => 9,
+                        'question' => 'What did the speaker say after coming out of the bathroom?',
+                        'choices' => [
+                            'Sorry',
+                            'Excuse me',
+                            'Thank you',
+                            'Nothing'
+                        ],
+                        'correctAnswer' => 'Thank you'
+                    ],
+                    [
+                        'id' => 10,
+                        'question' => 'What happened at the end of the story?',
+                        'choices' => [
+                            'The speaker ran away',
+                            'Someone entered the bathroom and reacted',
+                            'The speaker apologized',
+                            'Everyone forgot about it'
+                        ],
+                        'correctAnswer' => 'Someone entered the bathroom and reacted'
                     ]
                 ]
             ]
