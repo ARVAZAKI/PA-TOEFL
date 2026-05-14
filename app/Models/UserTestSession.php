@@ -19,6 +19,7 @@ class UserTestSession extends Model
     protected $casts = [
         'started_at' => 'datetime',
         'completed_at' => 'datetime',
+        'total_score' => 'float',
     ];
 
     // Relationships

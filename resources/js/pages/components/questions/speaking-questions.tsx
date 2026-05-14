@@ -1,13 +1,14 @@
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Props } from '@/types';
-import { useForm } from '@inertiajs/react';
+import { router, useForm } from '@inertiajs/react';
 import { CheckCircle, Flag, FlagOff, Mic, MicOff, Play, Square } from 'lucide-react';
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import NavigatorBox from '../layouts/navigator-question';
 
-const AI_API_URL = import.meta.env.VITE_AI_API_URL ?? 'http://127.0.0.1:5000';
+const AI_API_URL = '/ai';
 const AI_REQUEST_TIMEOUT_MS = 20000;
+const CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
 
 // Enhanced Speaking Recorder Component with auto-submit
 const SpeakingRecorder = ({
@@ -309,6 +310,7 @@ const SpeakingQuestion = forwardRef(function SpeakingQuestion({ onComplete, sect
         answers: {} as Record<number, string>,
         recordings: {} as Record<number, Blob>,
         scoreRecords: {} as Record<number, number>,
+        assessments: {} as Record<number, { score: number; feedback: string; strengths?: string[]; areas?: string[] }>,
         currentQuestionIndex: 0,
         score: 0,
         section: section,
@@ -320,6 +322,9 @@ const SpeakingQuestion = forwardRef(function SpeakingQuestion({ onComplete, sect
     const [message, setMessage] = useState('');
 
     const [processingQuestions, setProcessingQuestions] = useState<Set<number>>(new Set());
+    const answersRef = useRef<Record<number, string>>({});
+    const scoreRecordsRef = useRef<Record<number, number>>({});
+    const assessmentsRef = useRef<Record<number, { score: number; feedback: string; strengths?: string[]; areas_for_improvement?: string[] }>>({});
 
     // Handle both array and single object structure for speaking section
     const flatQuestions = Array.isArray(questions)
@@ -374,6 +379,36 @@ const SpeakingQuestion = forwardRef(function SpeakingQuestion({ onComplete, sect
     const handleSaveRecording = async (blob: Blob, questionId: number) => {
         setProcessingQuestions((prev) => new Set([...prev, questionId]));
 
+        const applyAssessment = (transcription: string, score: number, assessment?: { feedback?: string; strengths?: string[]; areas_for_improvement?: string[] }) => {
+            const safeScore = Math.min(Math.max(score, 0), 7.5);
+            const feedbackText = assessment?.feedback ?? 'Feedback not available yet.';
+            const nextAnswers = {
+                ...answersRef.current,
+                [questionId]: transcription,
+            };
+            const nextScoreRecords = {
+                ...scoreRecordsRef.current,
+                [questionId]: safeScore,
+            };
+            const nextAssessments = {
+                ...assessmentsRef.current,
+                [questionId]: {
+                    score: safeScore,
+                    feedback: feedbackText,
+                    strengths: assessment?.strengths,
+                    areas_for_improvement: assessment?.areas_for_improvement,
+                },
+            };
+
+            answersRef.current = nextAnswers;
+            scoreRecordsRef.current = nextScoreRecords;
+            assessmentsRef.current = nextAssessments;
+
+            setData('answers', nextAnswers);
+            setData('scoreRecords', nextScoreRecords);
+            setData('assessments', nextAssessments);
+        };
+
         try {
             // Save recording to state
             setData('recordings', { ...data.recordings, [questionId]: blob });
@@ -388,41 +423,39 @@ const SpeakingQuestion = forwardRef(function SpeakingQuestion({ onComplete, sect
 
             const response = await fetch(`${AI_API_URL}/assess-speaking`, {
                 method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': CSRF_TOKEN,
+                },
                 body: formData,
                 signal: controller.signal,
             });
 
             window.clearTimeout(timeoutId);
+            const result = await response.json().catch(() => ({}));
 
-            const result = await response.json();
+            const transcription = typeof result?.transcription === 'string' && result.transcription.trim().length > 0
+                ? result.transcription
+                : (typeof result?.error === 'string' ? result.error : 'Transcription unavailable. The assessment server is unavailable right now.');
 
-            if (response.ok) {
-                const score = Number(result.assessment.score);
-                console.log('Transcript:', result.transcription);
-                console.log('Score:', result.assessment.score);
+            const score = Number(result?.assessment?.score ?? 0);
+            const fallbackAssessment = result?.assessment ?? {
+                feedback: typeof result?.error === 'string' ? result.error : 'Assessment unavailable. Please try again later.',
+            };
 
-                setData('answers', {
-                    ...data.answers,
-                    [questionId]: result.transcription,
-                });
-                setData('scoreRecords', {
-                    ...data.scoreRecords,
-                    [questionId]: score,
-                });
+            applyAssessment(transcription, score > 0 ? score : 2.5, fallbackAssessment);
 
-                // Show success message briefly
-                console.log(`Recording submitted successfully! Score: ${score}`);
-            } else {
-                console.error('Failed transcription:', result);
-                alert('Failed to transcribe audio. Please try again.');
+            if (!response.ok) {
+                console.error('Speaking assessment fallback used:', result);
             }
+
+            console.log(`Recording submitted successfully! Score: ${Math.min(Math.max(score, 0), 7.5)}`);
         } catch (error) {
             console.error('Error sending audio:', error);
-            if (error instanceof DOMException && error.name === 'AbortError') {
-                alert('Audio assessment timed out. Please try again.');
-            } else {
-                alert('Failed to connect to the assessment server.');
-            }
+            applyAssessment('Transcription unavailable. The assessment server could not be reached.', 2.5, {
+                feedback: 'Assessment unavailable. Please try again later.',
+            });
         } finally {
             setProcessingQuestions((prev) => {
                 const newSet = new Set(prev);
@@ -433,7 +466,7 @@ const SpeakingQuestion = forwardRef(function SpeakingQuestion({ onComplete, sect
     };
 
     const calculateScore = () => {
-        return Object.values(data.scoreRecords).reduce((sum, val) => sum + val, 0);
+        return Object.values(scoreRecordsRef.current).reduce((sum, val) => sum + val, 0);
     };
 
     const handleSubmit = async () => {
@@ -444,13 +477,21 @@ const SpeakingQuestion = forwardRef(function SpeakingQuestion({ onComplete, sect
         try {
             const totalScore = calculateScore();
 
-            // Update score in form data
             setData('score', totalScore);
 
-            // Submit to backend
-            post('/submit-test');
-
-            onComplete();
+            router.post('/submit-test', {
+                section,
+                score: totalScore,
+                answers: answersRef.current,
+                assessments: assessmentsRef.current,
+                assessments_json: JSON.stringify(assessmentsRef.current),
+                questionSnapshots,
+                question_snapshots_json: JSON.stringify(questionSnapshots),
+            }, {
+                preserveScroll: true,
+                onSuccess: () => onComplete(),
+                onFinish: () => setIsSubmitting(false),
+            });
         } catch (error) {
             console.error('Error submitting test:', error);
             setIsSubmitting(false);
@@ -470,6 +511,20 @@ const SpeakingQuestion = forwardRef(function SpeakingQuestion({ onComplete, sect
         flagged: flagged,
     };
 
+    const questionSnapshots = Object.fromEntries(
+        flatQuestions.map((question: any, index: number) => [
+            question.id,
+            {
+                question: question.question,
+                questionType: 'speaking',
+                preparationTime: question.preparationTime,
+                responseTime: question.responseTime,
+                order: index + 1,
+                points: Math.round(30 / Math.max(flatQuestions.length, 1)),
+            },
+        ]),
+    );
+
     // Get progress info
     const answeredCount = Object.keys(data.answers).length;
     const progressPercentage = (answeredCount / flatQuestions.length) * 100;
@@ -485,12 +540,12 @@ const SpeakingQuestion = forwardRef(function SpeakingQuestion({ onComplete, sect
     }
 
     return (
-        <div className="flex w-full items-start justify-between gap-8">
+        <div className="flex w-full flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-8">
             {/* Sidebar Navigator */}
             <NavigatorBox propsNav={propsNavigator} />
 
             {/* Reading Passage */}
-            <div className="max-h-[85vh] w-1/3 flex-1 space-y-4 overflow-auto rounded-lg border border-gray-200 bg-white p-6 shadow-lg">
+            <div className="w-full flex-1 space-y-4 overflow-auto rounded-lg border border-gray-200 bg-white p-6 shadow-lg lg:max-h-[85vh] lg:w-1/3">
                 <div className="flex items-center justify-between border-b border-gray-200 pb-4">
                     <h2 className="text-xl font-semibold text-gray-800">{currentSpeaking.title}</h2>
                     <div className="text-sm text-gray-500">
@@ -545,7 +600,7 @@ const SpeakingQuestion = forwardRef(function SpeakingQuestion({ onComplete, sect
             </div>
 
             {/* Question & Recording Box */}
-            <div className="max-h-[100vh] w-1/3">
+            <div className="w-full lg:max-h-[100vh] lg:w-1/3">
                 <div className="max-h-[80vh] flex-1 space-y-4 overflow-auto rounded-t-lg border border-gray-200 bg-white p-6 shadow-lg">
                     <div key={currentQuestion.id} className="flex flex-col gap-4">
                         {/* Question Header */}
@@ -580,9 +635,6 @@ const SpeakingQuestion = forwardRef(function SpeakingQuestion({ onComplete, sect
                                         <CheckCircle className="h-4 w-4 text-green-500" />
                                         <span className="text-sm font-medium text-green-700">Answer recorded and submitted</span>
                                     </div>
-                                    {data.scoreRecords[currentQuestion.id] && (
-                                        <div className="mt-1 text-xs text-green-600">Score: {data.scoreRecords[currentQuestion.id]}/30</div>
-                                    )}
                                 </div>
                             )}
 

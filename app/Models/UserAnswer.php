@@ -11,6 +11,9 @@ class UserAnswer extends Model
         'question_id',
         'answer_text',
         'answer_content',
+        'score',
+        'feedback_text',
+        'assessment_data',
         'is_correct',
         'is_flagged',
         'time_spent_seconds',
@@ -19,6 +22,7 @@ class UserAnswer extends Model
     protected $casts = [
         'is_correct' => 'boolean',
         'is_flagged' => 'boolean',
+        'assessment_data' => 'array',
     ];
 
     // Relationships

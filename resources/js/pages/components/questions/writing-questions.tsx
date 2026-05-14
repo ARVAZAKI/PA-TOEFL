@@ -1,29 +1,31 @@
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Props } from '@/types';
-import { useForm } from '@inertiajs/react';
+import { router, useForm } from '@inertiajs/react';
 import { Flag, FlagOff } from 'lucide-react';
 import { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
 import NavigatorBox from '../layouts/navigator-question';
 import SubmissionLoading from '../utils/SubmissionLoading';
 
-const AI_API_URL = import.meta.env.VITE_AI_API_URL ?? 'http://127.0.0.1:5000';
+const AI_API_URL = '/ai';
 const AI_REQUEST_TIMEOUT_MS = 6000;
+const CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
 
 const getFallbackWritingScore = (answer: string) => {
     const wordCount = answer.split(/\s+/).filter((word) => word.length > 0).length;
 
-    if (wordCount >= 250) return 24;
-    if (wordCount >= 180) return 20;
-    if (wordCount >= 120) return 16;
-    if (wordCount >= 80) return 12;
+    if (wordCount >= 250) return 15;
+    if (wordCount >= 180) return 13;
+    if (wordCount >= 120) return 11;
+    if (wordCount >= 80) return 8;
 
-    return 6;
+    return 4;
 };
 
 const WritingQuestion = forwardRef(function WritingQuestion({ onComplete, section, questions }: Props, ref) {
-    const { data, setData, post } = useForm({
+    const { data, setData } = useForm({
         answers: {} as Record<number, string>,
+        assessments: {} as Record<number, { score: number; feedback: string; strengths?: string[]; areas?: string[] }>,
         currentIndex: 0,
         currentQuestionIndex: 0,
         score: 0,
@@ -35,15 +37,36 @@ const WritingQuestion = forwardRef(function WritingQuestion({ onComplete, sectio
     const [openDialog, setOpenDialog] = useState(false);
     const [message, setMessage] = useState('');
 
-    // Handle both array and single object structure for writing section
-    const flatQuestions = Array.isArray(questions)
-        ? (questions as any[]).flatMap((writing: any) =>
-              writing.questions ? writing.questions.map((q: any) => ({ ...q, writingId: writing.id })) : [],
-          )
-        : [{ ...(questions as any).question, writingId: (questions as any).id }];
+    const questionBlocks = Array.isArray(questions) ? (questions as any[]) : [questions as any];
+    const flatQuestions = questionBlocks.flatMap((writing: any) => {
+        if (Array.isArray(writing?.questions) && writing.questions.length > 0) {
+            return writing.questions.map((q: any) => ({ ...q, writingId: writing.id }));
+        }
+
+        if (writing?.question) {
+            return [
+                {
+                    ...(typeof writing.question === 'string' ? { question: writing.question } : writing.question),
+                    writingId: writing.id,
+                },
+            ];
+        }
+
+        if (writing?.question_text) {
+            return [
+                {
+                    id: writing.id,
+                    question: writing.question_text,
+                    writingId: writing.id,
+                },
+            ];
+        }
+
+        return [];
+    });
 
     const currentQuestion = flatQuestions[data.currentQuestionIndex];
-    const currentWriting = Array.isArray(questions) ? (questions as any[]).find((r: any) => r.id === currentQuestion?.writingId) : (questions as any);
+    const currentWriting = questionBlocks.find((r: any) => r?.id === currentQuestion?.writingId) ?? questionBlocks[0];
 
     // Safety check untuk memastikan currentWriting dan currentQuestion ada
     if (!currentQuestion || !currentWriting) {
@@ -113,6 +136,8 @@ const WritingQuestion = forwardRef(function WritingQuestion({ onComplete, sectio
                 return;
             }
 
+            const assessmentMap: Record<number, { score: number; feedback: string; strengths?: string[]; areas_for_improvement?: string[] }> = {};
+
             const scores = await Promise.all(
                 answeredQuestions.map(async (q: any) => {
                     const answer = data.answers[q.id]?.trim();
@@ -131,20 +156,40 @@ const WritingQuestion = forwardRef(function WritingQuestion({ onComplete, sectio
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest',
+                                'X-CSRF-TOKEN': CSRF_TOKEN,
                             },
                             body: JSON.stringify(payload),
                             signal: controller.signal,
                         });
 
                         if (!response.ok) {
-                            return getFallbackWritingScore(answer);
+                            const fallbackScore = getFallbackWritingScore(answer);
+                            assessmentMap[q.id] = {
+                                score: fallbackScore,
+                                feedback: 'Assessment unavailable. Please try again later.',
+                            };
+                            return fallbackScore;
                         }
 
                         const result = await response.json();
-                        return Math.min(Number(result.assessment?.score || 0), 30);
+                        const safeScore = Math.min(Number(result.assessment?.score || 0), 15);
+                        assessmentMap[q.id] = {
+                            score: safeScore,
+                            feedback: result.assessment?.feedback ?? 'Feedback not available yet.',
+                            strengths: result.assessment?.strengths,
+                            areas_for_improvement: result.assessment?.areas_for_improvement,
+                        };
+                        return safeScore;
                     } catch (error) {
                         console.error(`Error processing question ${q.id}:`, error);
-                        return getFallbackWritingScore(answer);
+                        const fallbackScore = getFallbackWritingScore(answer);
+                        assessmentMap[q.id] = {
+                            score: fallbackScore,
+                            feedback: 'Assessment unavailable. Please try again later.',
+                        };
+                        return fallbackScore;
                     } finally {
                         window.clearTimeout(timeoutId);
                     }
@@ -152,11 +197,25 @@ const WritingQuestion = forwardRef(function WritingQuestion({ onComplete, sectio
             );
 
             const totalScore = scores.reduce((sum, score) => sum + score, 0);
+            const sectionMaxScore = Math.min(flatQuestions.length * 15, 30);
+            const finalScore = Math.min(totalScore, sectionMaxScore);
 
-            // Calculate average score if multiple questions
-            const finalScore = answeredQuestions.length > 0 ? Math.round(totalScore / answeredQuestions.length) : 0;
+            setData('score', finalScore);
+            setData('assessments', assessmentMap);
 
-            setData('score', Math.min(finalScore, 30)); // Cap at 30
+            router.post('/submit-test', {
+                section,
+                score: finalScore,
+                answers: data.answers,
+                assessments: assessmentMap,
+                assessments_json: JSON.stringify(assessmentMap),
+                questionSnapshots,
+                question_snapshots_json: JSON.stringify(questionSnapshots),
+            }, {
+                preserveScroll: true,
+                onSuccess: () => onComplete(),
+                onFinish: () => setIsSubmitting(false),
+            });
         } catch (error) {
             console.error('Error submitting writing test:', error);
             setIsSubmitting(false);
@@ -166,13 +225,6 @@ const WritingQuestion = forwardRef(function WritingQuestion({ onComplete, sectio
     useImperativeHandle(ref, () => ({
         handleSubmit,
     }));
-
-    useEffect(() => {
-        if (data.score !== 0) {
-            post('/submit-test');
-            onComplete();
-        }
-    }, [data.score]);
 
     // Get word count for current answer
     const getCurrentWordCount = () => {
@@ -193,11 +245,26 @@ const WritingQuestion = forwardRef(function WritingQuestion({ onComplete, sectio
     const propsNavigator = {
         props: data,
         setData: setData,
-        sectionQuestions: questions,
+        sectionQuestions: questionBlocks,
         onComplete: onComplete,
         handleSubmit: handleSubmit,
         flagged: flagged,
     };
+
+    const questionSnapshots = Object.fromEntries(
+        flatQuestions.map((question: any, index: number) => [
+            question.id,
+            {
+                question: question.question,
+                questionType: 'essay',
+                passageTitle: (currentWriting as any)?.title ?? 'Writing Task',
+                passage: (currentWriting as any)?.passage || (currentWriting as any)?.context || '',
+                responseTime: (currentWriting as any)?.timeLimit ? Number((currentWriting as any).timeLimit) * 60 : null,
+                order: index + 1,
+                points: Math.round(30 / Math.max(flatQuestions.length, 1)),
+            },
+        ]),
+    );
 
     const currentWordCount = getCurrentWordCount();
     const isMinWordsMet = currentWordCount >= 400;
@@ -206,14 +273,14 @@ const WritingQuestion = forwardRef(function WritingQuestion({ onComplete, sectio
         <>
             <SubmissionLoading isVisible={isSubmitting} message="Evaluating your essay and calculating score" />
 
-            <div className="flex w-full items-start justify-between gap-8">
+            <div className="flex w-full flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-8">
                 {/* NAVIGATOR */}
                 <NavigatorBox propsNav={propsNavigator} />
 
                 {/* Reading/Prompt BOX */}
-                <div className="max-h-[85vh] w-1/3 flex-1 space-y-4 overflow-auto rounded-lg border border-gray-200 bg-white p-6 shadow-lg">
+                <div className="w-full flex-1 space-y-4 overflow-auto rounded-lg border border-gray-200 bg-white p-6 shadow-lg lg:max-h-[85vh] lg:w-1/3">
                     <div className="flex items-center justify-between border-b border-gray-200 pb-4">
-                        <h2 className="text-xl font-bold text-gray-800">{(currentWriting as any)?.title}</h2>
+                        <h2 className="text-xl font-bold text-gray-800">{(currentWriting as any)?.title ?? 'Writing Task'}</h2>
                         <div className="text-sm text-gray-500">Writing Section</div>
                     </div>
 
@@ -231,12 +298,14 @@ const WritingQuestion = forwardRef(function WritingQuestion({ onComplete, sectio
                     </div>
 
                     <div className="prose prose-sm max-w-none">
-                        <p className="text-justify leading-relaxed text-gray-700">{(currentWriting as any)?.passage}</p>
+                        <p className="text-justify leading-relaxed text-gray-700">
+                            {(currentWriting as any)?.passage || (currentWriting as any)?.context || 'Read the prompt carefully before answering.'}
+                        </p>
                     </div>
                 </div>
 
                 {/* Question & Answer Box */}
-                <div className="max-h-[100vh] w-1/3">
+                <div className="w-full lg:max-h-[100vh] lg:w-1/3">
                     <div className="max-h-[80vh] flex-1 space-y-4 overflow-auto rounded-t-lg border border-gray-200 bg-white p-6 shadow-lg">
                         <div key={(currentQuestion as any)?.id} className="flex flex-col gap-4">
                             <div className="flex justify-between gap-2 border-b border-gray-200 pb-3">
@@ -278,7 +347,7 @@ const WritingQuestion = forwardRef(function WritingQuestion({ onComplete, sectio
                                     id="answer"
                                     key={`question-${(currentQuestion as any)?.id}`}
                                     name={`question-${(currentQuestion as any)?.id}`}
-                                    className="min-h-[300px] w-full resize-none rounded-lg border border-gray-300 p-4 text-sm leading-relaxed transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                                    className="min-h-[200px] w-full resize-none rounded-lg border border-gray-300 p-4 text-sm leading-relaxed transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-200 lg:min-h-[300px]"
                                     placeholder="Write your essay here. Express your opinion clearly and support it with specific examples. Remember to aim for at least 400 words..."
                                     value={data.answers[(currentQuestion as any)?.id] || ''}
                                     onChange={(e) => handleAnswerChange((currentQuestion as any)?.id, e.target.value)}

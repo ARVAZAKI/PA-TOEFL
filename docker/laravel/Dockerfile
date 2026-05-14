@@ -1,8 +1,10 @@
 FROM php:8.2-cli-bookworm
 
 ARG VITE_AI_API_URL=http://localhost:5000
+ARG VITE_APP_NAME=TOEFL
 ENV COMPOSER_ALLOW_SUPERUSER=1
 ENV VITE_AI_API_URL=${VITE_AI_API_URL}
+ENV VITE_APP_NAME=${VITE_APP_NAME}
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \

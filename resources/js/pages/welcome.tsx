@@ -95,10 +95,7 @@ export default function Welcome() {
                                         Login to Start Test
                                     </Button>
                                 </Link>
-                                <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
-                                    <p className="font-semibold">Testing note</p>
-                                    <p className="mt-1">Questions are still dummy content for trial runs. Please log in with student@toefl.com to test the student flow.</p>
-                                </div>
+
                             </div>
                         )}
 

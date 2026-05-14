@@ -18,6 +18,7 @@ class UserSubtestProgress extends Model
     protected $casts = [
         'started_at' => 'datetime',
         'completed_at' => 'datetime',
+        'score' => 'float',
     ];
 
     // Relationships

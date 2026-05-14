@@ -15,7 +15,13 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
+        $middleware->trustProxies(at: '*');
+
         $middleware->encryptCookies(except: ['appearance']);
+        $middleware->validateCsrfTokens(except: [
+            'ai/assess-speaking',
+            'ai/assess-writing',
+        ]);
 
         $middleware->web(append: [
             HandleAppearance::class,

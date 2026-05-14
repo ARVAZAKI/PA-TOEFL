@@ -7,15 +7,11 @@ use Illuminate\Support\Facades\Auth;
 use App\Models\Subtest;
 use App\Models\Passage;
 use App\Models\Question;
-use App\Models\QuestionChoice;
 use App\Models\Toefl;
 use App\Models\UserAnswer;
 use App\Models\UserSubtestProgress;
 use App\Models\UserTestSession;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Collection;
 
 class TestUnitController extends Controller
@@ -78,31 +74,7 @@ class TestUnitController extends Controller
         $totalQuestions = $request->input('totalQuestions');
         $answers = $request->input('answers', []);
         $assessments = $request->input('assessments', []);
-        $questionSnapshots = $request->input('questionSnapshots', []);
-
-        if (empty($assessments) && $request->filled('assessments_json')) {
-            $decodedAssessments = json_decode((string) $request->input('assessments_json'), true);
-            if (is_array($decodedAssessments)) {
-                $assessments = $decodedAssessments;
-            }
-        }
-
-        if (empty($questionSnapshots) && $request->filled('question_snapshots_json')) {
-            $decodedSnapshots = json_decode((string) $request->input('question_snapshots_json'), true);
-            if (is_array($decodedSnapshots)) {
-                $questionSnapshots = $decodedSnapshots;
-            }
-        }
-
-        Log::info('submitTest received payload', [
-            'section' => $section,
-            'answers_count' => is_array($answers) ? count($answers) : 0,
-            'assessments_count' => is_array($assessments) ? count($assessments) : 0,
-            'question_snapshots_count' => is_array($questionSnapshots) ? count($questionSnapshots) : 0,
-            'score' => $request->input('score'),
-        ]);
-
-        $score = $this->storeSubmission($section, $answers, $assessments, $questionSnapshots, $request->input('score'));
+        $score = $this->storeSubmission($section, $answers, $assessments);
 
         switch ($section) {
             case "reading-question":
@@ -128,78 +100,25 @@ class TestUnitController extends Controller
         }
     }
 
-    public function assessSpeaking(Request $request): JsonResponse
-    {
-        $request->validate([
-            'audio' => ['required', 'file'],
-            'question' => ['required', 'string'],
-        ]);
-
-        $audioFile = $request->file('audio');
-        if (!$audioFile) {
-            return response()->json([
-                'message' => 'Audio file is required.',
-            ], 422);
-        }
-
-        try {
-            $response = Http::timeout(90)
-                ->attach(
-                    'audio',
-                    file_get_contents($audioFile->getRealPath()),
-                    $audioFile->getClientOriginalName() ?: 'recording.wav'
-                )
-                ->post($this->getAiApiBaseUrl() . '/assess-speaking', [
-                    'question' => (string) $request->input('question'),
-                ]);
-
-            return response()->json($response->json() ?? [
-                'message' => 'Invalid response from AI service.',
-            ], $response->status());
-        } catch (\Throwable $exception) {
-            return response()->json([
-                'message' => 'AI speaking assessment is unavailable.',
-                'error' => $exception->getMessage(),
-            ], 503);
-        }
-    }
-
-    public function assessWriting(Request $request): JsonResponse
-    {
-        $request->validate([
-            'question' => ['required', 'string'],
-            'answer' => ['required', 'string'],
-        ]);
-
-        try {
-            $response = Http::timeout(90)
-                ->acceptJson()
-                ->post($this->getAiApiBaseUrl() . '/assess-writing', [
-                    'question' => (string) $request->input('question'),
-                    'answer' => (string) $request->input('answer'),
-                ]);
-
-            return response()->json($response->json() ?? [
-                'message' => 'Invalid response from AI service.',
-            ], $response->status());
-        } catch (\Throwable $exception) {
-            return response()->json([
-                'message' => 'AI writing assessment is unavailable.',
-                'error' => $exception->getMessage(),
-            ], 503);
-        }
-    }
-
     public function feedback()
     {
         /** @var \App\Models\User $user */
         $user = Auth::user();
-        $testSession = $this->getSessionForResults($user->id, [
+
+        $sessionId = session('ActiveTestSessionId');
+
+        $sessionQuery = UserTestSession::with([
             'toefl',
             'subtestProgress.subtest',
             'subtestProgress.userAnswers.question.choices',
             'subtestProgress.userAnswers.question.passage',
-        ]);
+        ])->where('user_id', $user->id);
+
+        if ($sessionId) {
+            $sessionQuery->where('id', $sessionId);
+        }
+
+        $testSession = $sessionQuery->latest('created_at')->first();
 
         if (!$testSession) {
             return Inertia::render('feedback', [
@@ -266,7 +185,16 @@ class TestUnitController extends Controller
         /** @var \App\Models\User $user */
         $user = Auth::user();
         $username = $user->name;
-        $testSession = $this->getSessionForResults($user->id, ['subtestProgress.subtest', 'subtestProgress.userAnswers']);
+
+        $sessionId = session('ActiveTestSessionId');
+        $sessionQuery = UserTestSession::with(['subtestProgress.subtest', 'subtestProgress.userAnswers'])
+            ->where('user_id', $user->id);
+
+        if ($sessionId) {
+            $sessionQuery->where('id', $sessionId);
+        }
+
+        $testSession = $sessionQuery->latest('created_at')->first();
         if ($testSession) {
             $progressBySubtest = $testSession->subtestProgress->keyBy(function ($progress) {
                 return strtolower($progress->subtest->name);
@@ -306,7 +234,7 @@ class TestUnitController extends Controller
         ]);
     }
 
-    private function storeSubmission(string $section, array $answers, array $assessments, array $questionSnapshots, $requestedScore = null): float
+    private function storeSubmission(string $section, array $answers, array $assessments): int
     {
         if (!Auth::check()) {
             return 0;
@@ -317,7 +245,10 @@ class TestUnitController extends Controller
             return 0;
         }
 
-        $subtest = $this->getOrCreateSubtestByName($subtestName);
+        $subtest = Subtest::where('name', $subtestName)->first();
+        if (!$subtest) {
+            return 0;
+        }
 
         /** @var \App\Models\User $user */
         $user = Auth::user();
@@ -341,36 +272,16 @@ class TestUnitController extends Controller
         $subtestProgress->status = 'completed';
         $subtestProgress->completed_at = now();
 
-            $computedScore = is_numeric($requestedScore) ? (float) $requestedScore : 0;
+        $computedScore = 0;
 
         if (!empty($answers)) {
             $subtestProgress->userAnswers()->delete();
 
             $questionIds = array_map('intval', array_keys($answers));
             $questions = Question::with('choices')->whereIn('id', $questionIds)->get()->keyBy('id');
-            $resolvedQuestions = collect();
 
             foreach ($answers as $questionId => $answerValue) {
-                $resolvedQuestion = $questions->get((int) $questionId);
-                if (!$resolvedQuestion && isset($questionSnapshots[$questionId]) && is_array($questionSnapshots[$questionId])) {
-                    $resolvedQuestion = $this->resolveOrCreateQuestionFromSnapshot($subtest, $questionSnapshots[$questionId]);
-                }
-
-                if ($resolvedQuestion) {
-                    $resolvedQuestions->put((int) $questionId, $resolvedQuestion->loadMissing('choices'));
-                }
-            }
-
-            Log::info('storeSubmission resolved questions', [
-                'section' => $section,
-                'resolved_question_ids' => $resolvedQuestions->keys()->values()->all(),
-                'requested_score' => $requestedScore,
-            ]);
-
-            $assessments = $this->hydrateMissingAssessments($resolvedQuestions, $answers, $assessments);
-
-            foreach ($answers as $questionId => $answerValue) {
-                $question = $resolvedQuestions->get((int) $questionId);
+                $question = $questions->get((int) $questionId);
                 if (!$question) {
                     continue;
                 }
@@ -406,264 +317,23 @@ class TestUnitController extends Controller
                     $payload['answer_content'] = is_string($answerValue) ? $answerValue : null;
                 }
 
-                Log::info('storeSubmission creating user_answer', [
-                    'section' => $section,
-                    'question_id' => $question->id,
-                    'question_type' => $question->question_type,
-                    'has_assessment' => is_array($assessment),
-                    'assessment_score' => $assessmentScore,
-                    'assessment_feedback' => $assessmentFeedback,
-                    'assessment_keys' => is_array($assessment) ? array_keys($assessment) : [],
-                ]);
-
                 UserAnswer::create($payload);
             }
 
-            if ($resolvedQuestions->isNotEmpty()) {
-                $computedScore = $this->calculateSubmissionScore($resolvedQuestions, $answers, $assessments);
-            }
+            $computedScore = $this->calculateSubmissionScore($questions, $answers, $assessments);
         }
 
-        Log::info('storeSubmission completed', [
-            'section' => $section,
-            'computed_score' => $computedScore,
-            'subtest_progress_id' => $subtestProgress->id,
-        ]);
-
-        $subtestProgress->score = round($computedScore, 2);
+        $subtestProgress->score = $computedScore;
         $subtestProgress->save();
 
         $testSession->calculateTotalScore();
 
         $this->markSessionCompletedIfReady($testSession);
 
-        return round($computedScore, 2);
+        return $computedScore;
     }
 
-    private function hydrateMissingAssessments(Collection $questions, array $answers, array $assessments): array
-    {
-        foreach ($questions as $originalQuestionId => $question) {
-            if (!$question || $question->question_type === 'multiple_choice') {
-                continue;
-            }
-
-            $answerText = trim((string) ($answers[$originalQuestionId] ?? ''));
-            if ($answerText === '') {
-                continue;
-            }
-
-            $existingAssessment = $assessments[$originalQuestionId] ?? null;
-            $hasUsableAssessment = is_array($existingAssessment)
-                && (
-                    array_key_exists('feedback', $existingAssessment)
-                    || array_key_exists('score', $existingAssessment)
-                    || array_key_exists('strengths', $existingAssessment)
-                    || array_key_exists('areas_for_improvement', $existingAssessment)
-                );
-
-            if ($hasUsableAssessment) {
-                Log::info('hydrateMissingAssessments using incoming assessment', [
-                    'question_id' => $question->id,
-                    'question_type' => $question->question_type,
-                    'assessment_keys' => array_keys($existingAssessment),
-                ]);
-                continue;
-            }
-
-            $generatedAssessment = $question->question_type === 'speaking'
-                ? $this->requestSpeakingTextAssessment($question->question_text ?? '', $answerText)
-                : $this->requestWritingAssessment($question->question_text ?? '', $answerText);
-
-            if (is_array($generatedAssessment)) {
-                Log::info('hydrateMissingAssessments generated assessment', [
-                    'question_id' => $question->id,
-                    'question_type' => $question->question_type,
-                    'generated_score' => $generatedAssessment['score'] ?? null,
-                    'generated_feedback' => $generatedAssessment['feedback'] ?? null,
-                    'generated_keys' => array_keys($generatedAssessment),
-                ]);
-                $assessments[$originalQuestionId] = $generatedAssessment;
-            } else {
-                Log::warning('hydrateMissingAssessments failed to generate assessment', [
-                    'question_id' => $question->id,
-                    'question_type' => $question->question_type,
-                ]);
-            }
-        }
-
-        return $assessments;
-    }
-
-    private function requestSpeakingTextAssessment(string $question, string $answerText): array
-    {
-        if (str_contains(strtolower($answerText), 'transcription unavailable')) {
-            Log::warning('requestSpeakingTextAssessment short-circuited due to unavailable transcription', [
-                'question' => $question,
-                'answer_excerpt' => substr($answerText, 0, 120),
-            ]);
-            return [
-                'score' => 0,
-                'feedback' => $answerText,
-                'strengths' => [],
-                'areas_for_improvement' => ['Please retry recording in a quieter environment with a longer response.'],
-                'fallback' => true,
-            ];
-        }
-
-        try {
-            $response = Http::timeout(90)
-                ->acceptJson()
-                ->post($this->getAiApiBaseUrl() . '/assess-speaking-text', [
-                    'question' => $question,
-                    'answer' => $answerText,
-                ]);
-
-            $assessment = $response->json('assessment');
-            if (is_array($assessment)) {
-                Log::info('requestSpeakingTextAssessment received AI assessment', [
-                    'status' => $response->status(),
-                    'score' => $assessment['score'] ?? null,
-                    'feedback' => $assessment['feedback'] ?? null,
-                ]);
-                return $assessment;
-            }
-        } catch (\Throwable $exception) {
-            Log::warning('requestSpeakingTextAssessment AI request failed', [
-                'error' => $exception->getMessage(),
-            ]);
-        }
-
-        $wordCount = str_word_count($answerText);
-        $fallbackScore = min(7.5, max(1.0, $wordCount / 20));
-
-        return [
-            'score' => round($fallbackScore, 1),
-            'feedback' => 'Your speaking response was saved, but the detailed AI review is temporarily unavailable.',
-            'strengths' => ['Response provided'],
-            'areas_for_improvement' => ['Try expanding your response with more detail and clearer supporting ideas.'],
-            'fallback' => true,
-        ];
-    }
-
-    private function requestWritingAssessment(string $question, string $answerText): array
-    {
-        try {
-            $response = Http::timeout(90)
-                ->acceptJson()
-                ->post($this->getAiApiBaseUrl() . '/assess-writing', [
-                    'question' => $question,
-                    'answer' => $answerText,
-                ]);
-
-            $assessment = $response->json('assessment');
-            if (is_array($assessment)) {
-                Log::info('requestWritingAssessment received AI assessment', [
-                    'status' => $response->status(),
-                    'score' => $assessment['score'] ?? null,
-                    'feedback' => $assessment['feedback'] ?? null,
-                ]);
-                return $assessment;
-            }
-        } catch (\Throwable $exception) {
-            Log::warning('requestWritingAssessment AI request failed', [
-                'error' => $exception->getMessage(),
-            ]);
-        }
-
-        $wordCount = str_word_count($answerText);
-        $fallbackScore = $wordCount >= 250 ? 15 : ($wordCount >= 180 ? 13 : ($wordCount >= 120 ? 11 : ($wordCount >= 80 ? 8 : 4)));
-
-        return [
-            'score' => $fallbackScore,
-            'feedback' => 'Your writing response was saved, but the detailed AI review is temporarily unavailable.',
-            'strengths' => ['Response provided'],
-            'areas_for_improvement' => ['Add clearer examples and improve grammar accuracy to strengthen the response.'],
-            'fallback' => true,
-        ];
-    }
-
-    private function resolveOrCreateQuestionFromSnapshot(Subtest $subtest, array $snapshot): ?Question
-    {
-        $questionText = trim((string) ($snapshot['question'] ?? ''));
-        if ($questionText === '') {
-            return null;
-        }
-
-        $questionType = (string) ($snapshot['questionType'] ?? 'multiple_choice');
-        $questionType = in_array($questionType, ['multiple_choice', 'essay', 'speaking'], true)
-            ? $questionType
-            : 'multiple_choice';
-
-        $passage = null;
-        if (
-            $questionType === 'multiple_choice' &&
-            (!empty($snapshot['passage']) || !empty($snapshot['passageTitle']) || !empty($snapshot['audioUrl']))
-        ) {
-            $passageType = match (strtolower($subtest->name)) {
-                'listening' => 'listening',
-                'speaking' => 'speaking',
-                'writing' => 'writing',
-                default => 'reading',
-            };
-
-            $passage = Passage::firstOrCreate(
-                [
-                    'subtest_id' => $subtest->id,
-                    'title' => trim((string) ($snapshot['passageTitle'] ?? ($subtest->name . ' Passage'))),
-                    'content' => trim((string) ($snapshot['passage'] ?? '')),
-                    'type' => $passageType,
-                ],
-                [
-                    'audio_url' => $snapshot['audioUrl'] ?? null,
-                    'order' => (int) ($snapshot['order'] ?? 0),
-                ],
-            );
-
-            if (!$passage->audio_url && !empty($snapshot['audioUrl'])) {
-                $passage->audio_url = (string) $snapshot['audioUrl'];
-                $passage->save();
-            }
-        }
-
-        $question = Question::firstOrCreate(
-            [
-                'subtest_id' => $subtest->id,
-                'passage_id' => $passage?->id,
-                'question_text' => $questionText,
-            ],
-            [
-                'question_type' => $questionType,
-                'preparation_time' => $snapshot['preparationTime'] ?? null,
-                'response_time' => $snapshot['responseTime'] ?? null,
-                'order' => (int) ($snapshot['order'] ?? 0),
-                'points' => (int) ($snapshot['points'] ?? 30),
-            ],
-        );
-
-        if ($questionType === 'multiple_choice' && !empty($snapshot['choices']) && is_array($snapshot['choices'])) {
-            foreach (array_values($snapshot['choices']) as $index => $choiceText) {
-                $choiceText = trim((string) $choiceText);
-                if ($choiceText === '') {
-                    continue;
-                }
-
-                QuestionChoice::updateOrCreate(
-                    [
-                        'question_id' => $question->id,
-                        'choice_text' => $choiceText,
-                    ],
-                    [
-                        'choice_label' => chr(65 + $index),
-                        'is_correct' => trim((string) ($snapshot['correctAnswer'] ?? '')) === $choiceText,
-                    ],
-                );
-            }
-        }
-
-        return $question;
-    }
-
-    private function calculateSubmissionScore(Collection $questions, array $answers, array $assessments): float
+    private function calculateSubmissionScore(Collection $questions, array $answers, array $assessments): int
     {
         if ($questions->isEmpty()) {
             return 0;
@@ -687,7 +357,7 @@ class TestUnitController extends Controller
                 }
             }
 
-            return (float) round(($correctCount / max($questions->count(), 1)) * 30, 2);
+            return (int) round(($correctCount / max($questions->count(), 1)) * 30);
         }
 
         $score = 0.0;
@@ -699,32 +369,17 @@ class TestUnitController extends Controller
                 : 0.0;
 
             $maxRawScore = $question->question_type === 'speaking' ? 7.5 : 15.0;
+            $questionPoints = (float) ($question->points ?? 0);
 
-            if ($maxRawScore <= 0) {
+            if ($questionPoints <= 0 || $maxRawScore <= 0) {
                 continue;
             }
 
-            $score += max(0, min($maxRawScore, $rawScore));
+            $normalizedScore = ($rawScore / $maxRawScore) * $questionPoints;
+            $score += max(0, min($questionPoints, $normalizedScore));
         }
 
-        return round($score, 2);
-    }
-
-    private function getOrCreateSubtestByName(string $name): Subtest
-    {
-        return Subtest::firstOrCreate(['name' => $name]);
-    }
-
-    private function getSessionForResults(int $userId, array $with): ?UserTestSession
-    {
-        return UserTestSession::with($with)
-            ->where('user_id', $userId)
-            ->where(function ($query) {
-                $query->whereHas('subtestProgress.userAnswers')
-                    ->orWhereHas('subtestProgress');
-            })
-            ->orderByDesc('id')
-            ->first();
+        return (int) round($score);
     }
 
     private function markSessionCompletedIfReady(UserTestSession $testSession): void
@@ -748,7 +403,6 @@ class TestUnitController extends Controller
         $testSession->status = 'completed';
         $testSession->completed_at = now();
         $testSession->save();
-        session()->forget('ActiveTestSessionId');
     }
 
     private function resolveSubtestName(string $section): ?string
@@ -786,11 +440,6 @@ class TestUnitController extends Controller
         session(['ActiveTestSessionId' => $session->id]);
 
         return $session;
-    }
-
-    private function getAiApiBaseUrl(): string
-    {
-        return rtrim((string) env('AI_API_URL', 'http://flask-ai:5000'), '/');
     }
 
     private function buildReadingFeedback(?UserSubtestProgress $progress): array
@@ -890,10 +539,6 @@ class TestUnitController extends Controller
             foreach ($progress->userAnswers->sortBy('question.order') as $answer) {
                 $question = $answer->question;
                 $assessment = is_array($answer->assessment_data) ? $answer->assessment_data : [];
-                $feedbackText = $answer->feedback_text
-                    ?? ($assessment['feedback'] ?? null)
-                    ?? 'Feedback will appear after evaluation.';
-                $areasForImprovement = $assessment['areas_for_improvement'] ?? $assessment['areas'] ?? [];
 
                 $questions[] = [
                     'id' => $question?->id ?? $answer->id,
@@ -902,9 +547,9 @@ class TestUnitController extends Controller
                     'audioFile' => null,
                     'score' => $answer->score !== null ? (float) $answer->score : null,
                     'maxScore' => 7.5,
-                    'feedback' => $feedbackText,
+                    'feedback' => $answer->feedback_text ?? 'Feedback will appear after evaluation.',
                     'strengths' => array_values($assessment['strengths'] ?? []),
-                    'areasForImprovement' => array_values(is_array($areasForImprovement) ? $areasForImprovement : []),
+                    'areasForImprovement' => array_values($assessment['areas_for_improvement'] ?? []),
                     'isFallback' => (bool) ($assessment['fallback'] ?? false),
                 ];
             }
@@ -927,10 +572,6 @@ class TestUnitController extends Controller
             foreach ($progress->userAnswers->sortBy('question.order') as $answer) {
                 $question = $answer->question;
                 $assessment = is_array($answer->assessment_data) ? $answer->assessment_data : [];
-                $feedbackText = $answer->feedback_text
-                    ?? ($assessment['feedback'] ?? null)
-                    ?? 'Feedback will appear after evaluation.';
-                $areasForImprovement = $assessment['areas_for_improvement'] ?? $assessment['areas'] ?? [];
 
                 $questions[] = [
                     'id' => $question?->id ?? $answer->id,
@@ -938,9 +579,9 @@ class TestUnitController extends Controller
                     'userAnswer' => $answer->answer_content ?? '',
                     'score' => $answer->score !== null ? (float) $answer->score : null,
                     'maxScore' => 15,
-                    'feedback' => $feedbackText,
+                    'feedback' => $answer->feedback_text ?? 'Feedback will appear after evaluation.',
                     'strengths' => array_values($assessment['strengths'] ?? []),
-                    'areasForImprovement' => array_values(is_array($areasForImprovement) ? $areasForImprovement : []),
+                    'areasForImprovement' => array_values($assessment['areas_for_improvement'] ?? []),
                     'isFallback' => (bool) ($assessment['fallback'] ?? false),
                 ];
             }
@@ -955,7 +596,7 @@ class TestUnitController extends Controller
 
     private function getReadingQuestions()
     {
-        $subtest = $this->getOrCreateSubtestByName('Reading');
+        $subtest = Subtest::where('name', 'Reading')->first();
 
         if ($subtest) {
             $passages = Passage::where('subtest_id', $subtest->id)
@@ -1130,7 +771,7 @@ The influence of jazz extended far beyond music itself. It played a crucial role
 
     private function getListeningQuestions()
     {
-        $subtest = $this->getOrCreateSubtestByName('Listening');
+        $subtest = Subtest::where('name', 'Listening')->first();
 
         if ($subtest) {
             $passages = Passage::where('subtest_id', $subtest->id)
@@ -1289,7 +930,7 @@ The influence of jazz extended far beyond music itself. It played a crucial role
 
     private function getSpeakingQuestions()
     {
-        $subtest = $this->getOrCreateSubtestByName('Speaking');
+        $subtest = Subtest::where('name', 'Speaking')->first();
 
         if ($subtest) {
             $questions = Question::where('subtest_id', $subtest->id)
@@ -1337,7 +978,7 @@ The influence of jazz extended far beyond music itself. It played a crucial role
 
     private function getWritingQuestions()
     {
-        $subtest = $this->getOrCreateSubtestByName('Writing');
+        $subtest = Subtest::where('name', 'Writing')->first();
 
         if ($subtest) {
             $questions = Question::where('subtest_id', $subtest->id)

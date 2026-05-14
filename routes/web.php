@@ -13,8 +13,11 @@ Route::get('/', function () {
 Route::middleware(['auth'])->group(function () {
     Route::get('/test/{section?}', [TestUnitController::class, 'subtestShow'])->name('test.show');
     Route::post('/submit-test', [TestUnitController::class, 'submitTest'])->name('submit-test');
+    Route::post('/ai/assess-speaking', [TestUnitController::class, 'assessSpeaking'])->name('ai.assess-speaking');
+    Route::post('/ai/assess-writing', [TestUnitController::class, 'assessWriting'])->name('ai.assess-writing');
     Route::post('/reset-test', [TestUnitController::class, 'resetTest'])->name('reset-test');
     Route::get('/scoreboard', [TestUnitController::class, 'scoreboard'])->name('scoreboard');
+    Route::get('/feedback', [TestUnitController::class, 'feedback'])->name('feedback');
 });
 
 Route::middleware(['auth', 'verified'])->group(function () {

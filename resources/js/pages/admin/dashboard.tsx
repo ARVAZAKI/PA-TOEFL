@@ -178,33 +178,7 @@ export default function AdminDashboard() {
                     </CardContent>
                 </Card>
 
-                {/* Quick Actions */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Quick Actions</CardTitle>
-                        <CardDescription>Common administrative tasks</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                            <Button variant="outline" className="h-auto flex-col gap-2 py-4">
-                                <FileText className="h-6 w-6" />
-                                <span>Create New Test</span>
-                            </Button>
-                            <Button variant="outline" className="h-auto flex-col gap-2 py-4">
-                                <BookOpen className="h-6 w-6" />
-                                <span>Add Questions</span>
-                            </Button>
-                            <Button variant="outline" className="h-auto flex-col gap-2 py-4">
-                                <Users className="h-6 w-6" />
-                                <span>Manage Users</span>
-                            </Button>
-                            <Button variant="outline" className="h-auto flex-col gap-2 py-4">
-                                <TrendingUp className="h-6 w-6" />
-                                <span>View Analytics</span>
-                            </Button>
-                        </div>
-                    </CardContent>
-                </Card>
+                {/* Quick Actions removed as requested */}
             </div>
         </AdminLayout>
     );

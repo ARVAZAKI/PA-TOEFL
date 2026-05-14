@@ -1,5 +1,5 @@
 import { Head, useForm } from '@inertiajs/react';
-import { LoaderCircle, BookOpen } from 'lucide-react';
+import { LoaderCircle } from 'lucide-react';
 import { FormEventHandler } from 'react';
 
 import InputError from '@/components/input-error';
@@ -102,18 +102,11 @@ export default function Login({ status, canResetPassword }: LoginProps) {
                 </div>
             </form>
 
-            <div className="mt-6 rounded-lg border border-blue-200 bg-blue-50 p-4">
-                <div className="flex items-start gap-3">
-                    <BookOpen className="h-5 w-5 text-blue-600 mt-0.5" />
-                    <div className="flex-1">
-                        <h4 className="mb-2 text-sm font-semibold text-blue-900">Testing Note</h4>
-                        <div className="space-y-1 text-xs text-blue-700">
-                            <p>This is a trial test for the final project and does not use the original TOEFL questions yet.</p>
-                            <p>email: student@toefl.com</p>
-                            <p>password: password</p>
-                        </div>
-                    </div>
-                </div>
+            <div className="mt-6 text-center text-sm text-gray-600">
+                Don't have an account?{' '}
+                <a href={route('register')} className="text-blue-600 font-semibold hover:underline">
+                    Register here
+                </a>
             </div>
         </AuthLayout>
     );

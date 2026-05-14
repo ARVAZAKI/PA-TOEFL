@@ -66,6 +66,26 @@ const ReadingQuestion = forwardRef(function ReadingQuestion({ onComplete, sectio
 
     const answeredCount = Object.keys(data.answers).length;
 
+    const questionSnapshots = Object.fromEntries(
+        flatQuestions.map((question: any, index: number) => {
+            const reading = questions.find((item) => item.id === question.readingId) as any;
+
+            return [
+                question.id,
+                {
+                    question: question.question,
+                    questionType: 'multiple_choice',
+                    choices: question.choices,
+                    correctAnswer: question.correctAnswer,
+                    passageTitle: reading?.title ?? 'Reading Passage',
+                    passage: reading?.passage ?? '',
+                    order: index + 1,
+                    points: Math.round(30 / Math.max(flatQuestions.length, 1)),
+                },
+            ];
+        }),
+    );
+
     const handleSubmit = () => {
         let correctCount = 0;
         // const unansweredQuestions = flatQuestions.filter((q) => !data.answers[q.id]);
@@ -92,6 +112,7 @@ const ReadingQuestion = forwardRef(function ReadingQuestion({ onComplete, sectio
             score: finalScore,
             correctCount,
             totalQuestions: flatQuestions.length,
+            questionSnapshots,
         }));
 
         post('/submit-test', {
@@ -125,18 +146,18 @@ const ReadingQuestion = forwardRef(function ReadingQuestion({ onComplete, sectio
     };
 
     return (
-        <div className="flex w-full items-start justify-between gap-8">
+        <div className="flex w-full flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-8">
             {/* Navigator */}
             <NavigatorBox propsNav={propsNavigator} />
 
             {/* Reading Box */}
-            <div className="max-h-[85vh] w-1/3 flex-1 space-y-4 overflow-auto rounded-sm bg-white p-4 shadow-sm">
+            <div className="w-full flex-1 space-y-4 overflow-auto rounded-sm bg-white p-4 shadow-sm lg:max-h-[85vh] lg:w-1/3">
                 <h2 className="text-xl font-semibold">Passage : {currentReading.title}</h2>
                 <p className="text-justify break-words text-gray-700 select-none">{(currentReading as any).passage}</p>
             </div>
 
             {/* Questions Section */}
-            <div className="max-h-[100vh] w-1/3">
+            <div className="w-full lg:max-h-[100vh] lg:w-1/3">
                 <div className="max-h-[80vh] flex-1 space-y-4 overflow-auto rounded-t-lg border border-gray-200 bg-white p-6 shadow-lg">
                     <div key={currentQuestion.id} className="flex flex-col gap-4">
                         {/* Question Header */}

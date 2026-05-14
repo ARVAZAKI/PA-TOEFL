@@ -39,11 +39,6 @@ const mainNavGroups: NavGroup[] = [
                 url: '/admin/dashboard',
                 icon: LayoutDashboard,
             },
-            {
-                title: 'TOEFL Tests',
-                url: '/admin/toefls',
-                icon: FileText,
-            },
         ],
     },
     {

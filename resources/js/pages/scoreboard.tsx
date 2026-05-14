@@ -17,6 +17,14 @@ interface ScoreData {
     listeningTotalQuestions?: number;
 }
 
+declare global {
+    interface Window {
+        jspdf?: {
+            jsPDF: new (options?: { orientation?: string; unit?: string; format?: string }) => any;
+        };
+    }
+}
+
 export default function Scoreboard() {
     const { props } = usePage();
     const {
@@ -35,210 +43,187 @@ export default function Scoreboard() {
 
     const totalScore = readingScore + listeningScore + speakingScore + writingScore;
     const maxScore = 30;
-    const maxTotalScore = maxScore * 4; // Total 120 points
+    const maxTotalScore = maxScore * 4;
 
     // Check if all sections are completed (allow 0 scores)
     const allSectionsCompleted = readingScore >= 0 && listeningScore >= 0 && speakingScore >= 0 && writingScore >= 0;
 
-    const generateCertificate = () => {
+    const loadScript = (src: string, isReady: () => boolean) =>
+        new Promise<void>((resolve, reject) => {
+            if (isReady()) {
+                resolve();
+                return;
+            }
+
+            const existingScript = document.querySelector(`script[src="${src}"]`) as HTMLScriptElement | null;
+            if (existingScript) {
+                existingScript.addEventListener('load', () => resolve(), { once: true });
+                existingScript.addEventListener('error', () => reject(new Error(`Failed to load script: ${src}`)), { once: true });
+                return;
+            }
+
+            const script = document.createElement('script');
+            script.src = src;
+            script.async = true;
+            script.onload = () => resolve();
+            script.onerror = () => reject(new Error(`Failed to load script: ${src}`));
+            document.body.appendChild(script);
+        });
+
+    const blobToDataUrl = (blob: Blob) =>
+        new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                if (typeof reader.result === 'string') {
+                    resolve(reader.result);
+                    return;
+                }
+
+                reject(new Error('Failed to convert blob to data URL.'));
+            };
+            reader.onerror = () => reject(new Error('Failed to read blob.'));
+            reader.readAsDataURL(blob);
+        });
+
+    const fetchQrCodeDataUrl = async (targetUrl: string) => {
+        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(targetUrl)}`;
+        const response = await fetch(qrUrl);
+        if (!response.ok) {
+            throw new Error('Failed to generate QR code.');
+        }
+
+        const blob = await response.blob();
+        return blobToDataUrl(blob);
+    };
+
+    const generateCertificate = async () => {
         setIsGenerating(true);
 
-        // Create certificate content
-        const certificateContent = `
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <meta charset="UTF-8">
-                <title>TOEFL Certificate - ${username || 'Student'}</title>
-                <style>
-                    body {
-                        font-family: 'Times New Roman', serif;
-                        margin: 0;
-                        padding: 40px;
-                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                        min-height: 100vh;
-                    }
-                    .certificate {
-                        background: white;
-                        padding: 60px;
-                        border-radius: 20px;
-                        box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-                        text-align: center;
-                        max-width: 800px;
-                        margin: 0 auto;
-                        border: 8px solid #f8f9fa;
-                        position: relative;
-                    }
-                    .certificate::before {
-                        content: '';
-                        position: absolute;
-                        top: 20px;
-                        left: 20px;
-                        right: 20px;
-                        bottom: 20px;
-                        border: 3px solid #6366f1;
-                        border-radius: 15px;
-                    }
-                    .header {
-                        margin-bottom: 40px;
-                    }
-                    .title {
-                        font-size: 48px;
-                        font-weight: bold;
-                        color: #1e40af;
-                        margin-bottom: 10px;
-                        text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
-                    }
-                    .subtitle {
-                        font-size: 24px;
-                        color: #6b7280;
-                        margin-bottom: 40px;
-                    }
-                    .recipient {
-                        font-size: 32px;
-                        color: #1f2937;
-                        margin: 30px 0;
-                        font-weight: bold;
-                    }
-                    .scores {
-                        display: grid;
-                        grid-template-columns: repeat(2, 1fr);
-                        gap: 20px;
-                        margin: 40px 0;
-                        text-align: left;
-                    }
-                    .score-item {
-                        background: #f8fafc;
-                        padding: 20px;
-                        border-radius: 10px;
-                        border-left: 5px solid #6366f1;
-                    }
-                    .score-label {
-                        font-size: 16px;
-                        color: #6b7280;
-                        margin-bottom: 5px;
-                    }
-                    .score-value {
-                        font-size: 24px;
-                        font-weight: bold;
-                        color: #1f2937;
-                    }
-                    .total-score {
-                        background: linear-gradient(135deg, #6366f1, #8b5cf6);
-                        color: white;
-                        padding: 30px;
-                        border-radius: 15px;
-                        margin: 40px 0;
-                    }
-                    .total-score h3 {
-                        margin: 0 0 10px 0;
-                        font-size: 24px;
-                    }
-                    .total-score .score {
-                        font-size: 48px;
-                        font-weight: bold;
-                        margin: 0;
-                    }
-                    .date {
-                        font-size: 18px;
-                        color: #6b7280;
-                        margin-top: 40px;
-                    }
-                    .footer {
-                        margin-top: 40px;
-                        border-top: 2px solid #e5e7eb;
-                        padding-top: 20px;
-                    }
-                    .watermark {
-                        position: absolute;
-                        top: 50%;
-                        left: 50%;
-                        transform: translate(-50%, -50%) rotate(-45deg);
-                        font-size: 120px;
-                        color: rgba(99, 102, 241, 0.05);
-                        font-weight: bold;
-                        z-index: 0;
-                        pointer-events: none;
-                    }
-                    .content {
-                        position: relative;
-                        z-index: 1;
-                    }
-                </style>
-            </head>
-            <body>
-                <div class="certificate">
-                    <div class="watermark">TOEFL</div>
-                    <div class="content">
-                        <div class="header">
-                            <h1 class="title">CERTIFICATE</h1>
-                            <p class="subtitle">Test of English as a Foreign Language</p>
-                        </div>
-                        
-                        <p style="font-size: 20px; color: #6b7280; margin: 20px 0;">This is to certify that</p>
-                        <div class="recipient">${username || 'Student'}</div>
-                        <p style="font-size: 18px; color: #6b7280; margin: 20px 0;">has successfully completed the TOEFL Practice Test</p>
-                        
-                        <div class="total-score">
-                            <h3>Total Score</h3>
-                            <p class="score">${totalScore}/120</p>
-                        </div>
-                        
-                        <div class="scores">
-                            <div class="score-item">
-                                <div class="score-label">Reading</div>
-                                <div class="score-value">${readingScore}/30</div>
-                            </div>
-                            <div class="score-item">
-                                <div class="score-label">Listening</div>
-                                <div class="score-value">${listeningScore}/30</div>
-                            </div>
-                            <div class="score-item">
-                                <div class="score-label">Speaking</div>
-                                <div class="score-value">${speakingScore}/30</div>
-                            </div>
-                            <div class="score-item">
-                                <div class="score-label">Writing</div>
-                                <div class="score-value">${writingScore}/30</div>
-                            </div>
-                        </div>
-                        
-                        <div class="footer">
-                            <div class="date">Completed on ${new Date().toLocaleDateString('en-US', {
-                                year: 'numeric',
-                                month: 'long',
-                                day: 'numeric',
-                            })}</div>
-                            <p style="font-size: 14px; color: #9ca3af; margin-top: 20px;">
-                                This certificate is issued for practice purposes only and does not represent an official TOEFL score.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            </body>
-            </html>
-        `;
+        try {
+            await loadScript(
+                'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js',
+                () => Boolean(window.jspdf?.jsPDF),
+            );
 
-        // Create and download the certificate
-        const blob = new Blob([certificateContent], { type: 'text/html' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `TOEFL_Certificate_${username || 'Student'}_${new Date().getTime()}.html`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
+            const jsPDF = window.jspdf?.jsPDF;
+            if (!jsPDF) {
+                throw new Error('PDF library is unavailable.');
+            }
 
-        setIsGenerating(false);
+            const qrCodeDataUrl = await fetchQrCodeDataUrl('https://toefl.faintry.com');
+            const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+            const pageWidth = pdf.internal.pageSize.getWidth();
+            const pageHeight = pdf.internal.pageSize.getHeight();
+            const centerX = pageWidth / 2;
+
+            pdf.setFillColor(245, 247, 255);
+            pdf.rect(8, 8, pageWidth - 16, pageHeight - 16, 'F');
+            pdf.setDrawColor(37, 99, 235);
+            pdf.setLineWidth(1.2);
+            pdf.rect(12, 12, pageWidth - 24, pageHeight - 24);
+            pdf.setLineWidth(0.4);
+            pdf.rect(16, 16, pageWidth - 32, pageHeight - 32);
+
+            pdf.setTextColor(30, 64, 175);
+            pdf.setFont('helvetica', 'bold');
+            pdf.setFontSize(28);
+            pdf.text('CERTIFICATE', centerX, 33, { align: 'center' });
+
+            pdf.setTextColor(71, 85, 105);
+            pdf.setFont('helvetica', 'normal');
+            pdf.setFontSize(12);
+            pdf.text('TOEFL Practice Test Certificate', centerX, 41, { align: 'center' });
+
+            pdf.setTextColor(100, 116, 139);
+            pdf.setFontSize(11);
+            pdf.text('This is to certify that', centerX, 58, { align: 'center' });
+
+            pdf.setTextColor(15, 23, 42);
+            pdf.setFont('times', 'bold');
+            pdf.setFontSize(24);
+            pdf.text(username || 'Student', centerX, 70, { align: 'center' });
+
+            pdf.setTextColor(71, 85, 105);
+            pdf.setFont('helvetica', 'normal');
+            pdf.setFontSize(11);
+            pdf.text('has successfully completed the TOEFL Practice Test', centerX, 79, { align: 'center' });
+
+            pdf.setFillColor(37, 99, 235);
+            pdf.roundedRect(48, 88, pageWidth - 96, 24, 4, 4, 'F');
+            pdf.setTextColor(255, 255, 255);
+            pdf.setFont('helvetica', 'bold');
+            pdf.setFontSize(12);
+            pdf.text('TOTAL SCORE', centerX, 96, { align: 'center' });
+            pdf.setFontSize(24);
+            pdf.text(`${totalScore}/120`, centerX, 106, { align: 'center' });
+
+            const scoreCards = [
+                { label: 'Reading', value: `${readingScore}/30`, x: 24, y: 125 },
+                { label: 'Listening', value: `${listeningScore}/30`, x: 108, y: 125 },
+                { label: 'Speaking', value: `${speakingScore}/30`, x: 24, y: 152 },
+                { label: 'Writing', value: `${writingScore}/30`, x: 108, y: 152 },
+            ];
+
+            scoreCards.forEach((card) => {
+                pdf.setFillColor(255, 255, 255);
+                pdf.setDrawColor(203, 213, 225);
+                pdf.roundedRect(card.x, card.y, 78, 21, 3, 3, 'FD');
+                pdf.setTextColor(100, 116, 139);
+                pdf.setFont('helvetica', 'normal');
+                pdf.setFontSize(10);
+                pdf.text(card.label, card.x + 6, card.y + 8);
+                pdf.setTextColor(15, 23, 42);
+                pdf.setFont('helvetica', 'bold');
+                pdf.setFontSize(15);
+                pdf.text(card.value, card.x + 6, card.y + 16);
+            });
+
+            pdf.addImage(qrCodeDataUrl, 'PNG', centerX - 18, 186, 36, 36);
+            pdf.setTextColor(71, 85, 105);
+            pdf.setFont('helvetica', 'normal');
+            pdf.setFontSize(9);
+            pdf.text('Scan to visit', centerX, 227, { align: 'center' });
+            pdf.setTextColor(30, 64, 175);
+            pdf.setFontSize(10);
+            pdf.text('https://toefl.faintry.com', centerX, 233, { align: 'center' });
+
+            pdf.setTextColor(100, 116, 139);
+            pdf.setFont('helvetica', 'normal');
+            pdf.setFontSize(10);
+            pdf.text(
+                `Completed on ${new Date().toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                })}`,
+                centerX,
+                246,
+                { align: 'center' },
+            );
+
+            pdf.setFontSize(8.5);
+            pdf.text(
+                'This certificate is issued for practice purposes only and does not represent an official TOEFL score.',
+                centerX,
+                254,
+                { align: 'center', maxWidth: 150 },
+            );
+
+            pdf.save(`TOEFL_Certificate_${username || 'Student'}_${Date.now()}.pdf`);
+        } catch (error) {
+            console.error('Failed to generate certificate PDF:', error);
+            alert('Unable to generate the certificate PDF right now. Please try again.');
+        } finally {
+            setIsGenerating(false);
+        }
     };
 
-    const progressWidth = (score: number) => {
-        return Math.min((score / maxScore) * 100, 100);
+    const progressWidth = (score: number, total: number) => {
+        return total > 0 ? Math.min((score / total) * 100, 100) : 0;
     };
 
-    const getScoreLevel = (score: number) => {
-        const percentage = (score / maxScore) * 100;
+    const getScoreLevel = (score: number, total: number) => {
+        const percentage = total > 0 ? (score / total) * 100 : 0;
         if (percentage >= 90) return { level: 'Excellent', color: 'text-green-600', bgColor: 'bg-green-100' };
         if (percentage >= 80) return { level: 'Very Good', color: 'text-blue-600', bgColor: 'bg-blue-100' };
         if (percentage >= 70) return { level: 'Good', color: 'text-yellow-600', bgColor: 'bg-yellow-100' };
@@ -259,6 +244,7 @@ export default function Scoreboard() {
         {
             name: 'Reading',
             score: readingScore,
+            total: 30,
             icon: BookOpen,
             color: 'blue',
             correctCount: readingCorrectCount,
@@ -267,13 +253,14 @@ export default function Scoreboard() {
         {
             name: 'Listening',
             score: listeningScore,
+            total: 30,
             icon: TrendingUp,
             color: 'green',
             correctCount: listeningCorrectCount,
             totalQuestions: listeningTotalQuestions,
         },
-        { name: 'Speaking', score: speakingScore, icon: BarChart3, color: 'purple' },
-        { name: 'Writing', score: writingScore, icon: Award, color: 'orange' },
+        { name: 'Speaking', score: speakingScore, total: 30, icon: BarChart3, color: 'purple' },
+        { name: 'Writing', score: writingScore, total: 30, icon: Award, color: 'orange' },
     ];
 
     const overallLevel = getTotalScoreLevel();
@@ -306,7 +293,7 @@ export default function Scoreboard() {
                                 </CardDescription>
                             </CardHeader>
                             <CardContent className="text-center">
-                                <div className="mb-2 text-6xl font-bold">{totalScore}</div>
+                                <div className="mb-2 text-4xl font-bold sm:text-6xl">{totalScore}</div>
                                 <div className="mb-4 text-xl">out of {maxTotalScore}</div>
                                 <div className={`inline-flex items-center rounded-full border border-white/20 bg-white/20 px-4 py-2`}>
                                     <span className="font-semibold text-white">{overallLevel.level}</span>
@@ -352,7 +339,7 @@ export default function Scoreboard() {
                         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                             {sections.map((section) => {
                                 const Icon = section.icon;
-                                const level = getScoreLevel(section.score);
+                                const level = getScoreLevel(section.score, section.total);
                                 const colorMap = {
                                     blue: 'from-blue-500 to-blue-600',
                                     green: 'from-green-500 to-green-600',
@@ -371,7 +358,7 @@ export default function Scoreboard() {
                                                 </div>
                                                 <div className="text-right">
                                                     <div className="text-2xl font-bold text-gray-800">{section.score}</div>
-                                                    <div className="text-sm text-gray-500">/ {maxScore}</div>
+                                                    <div className="text-sm text-gray-500">/ {section.total}</div>
                                                 </div>
                                             </div>
                                             <CardTitle className="text-lg">{section.name}</CardTitle>
@@ -381,7 +368,7 @@ export default function Scoreboard() {
                                                 <div className="h-2 rounded-full bg-gray-200">
                                                     <div
                                                         className={`bg-gradient-to-r ${colorMap[section.color as keyof typeof colorMap]} h-2 rounded-full transition-all duration-1000 ease-out`}
-                                                        style={{ width: `${progressWidth(section.score)}%` }}
+                                                        style={{ width: `${progressWidth(section.score, section.total)}%` }}
                                                     ></div>
                                                 </div>
                                                 <div
@@ -415,14 +402,14 @@ export default function Scoreboard() {
                                         <h4 className="mb-2 font-semibold text-gray-800">Strengths</h4>
                                         <ul className="space-y-1 text-sm text-gray-600">
                                             {sections
-                                                .filter((s) => s.score >= maxScore * 0.7)
+                                                .filter((s) => s.total > 0 && s.score >= s.total * 0.7)
                                                 .map((s) => (
                                                     <li key={s.name} className="flex items-center gap-2">
                                                         <div className="h-2 w-2 rounded-full bg-green-500"></div>
                                                         {s.name} - {s.score} points
                                                     </li>
                                                 ))}
-                                            {sections.filter((s) => s.score >= maxScore * 0.7).length === 0 && (
+                                            {sections.filter((s) => s.total > 0 && s.score >= s.total * 0.7).length === 0 && (
                                                 <li className="text-gray-500 italic">Keep practicing to improve your scores!</li>
                                             )}
                                         </ul>
@@ -431,14 +418,14 @@ export default function Scoreboard() {
                                         <h4 className="mb-2 font-semibold text-gray-800">Areas for Improvement</h4>
                                         <ul className="space-y-1 text-sm text-gray-600">
                                             {sections
-                                                .filter((s) => s.score < maxScore * 0.7)
+                                                .filter((s) => s.total > 0 && s.score < s.total * 0.7)
                                                 .map((s) => (
                                                     <li key={s.name} className="flex items-center gap-2">
                                                         <div className="h-2 w-2 rounded-full bg-orange-500"></div>
                                                         {s.name} - Focus on practice
                                                     </li>
                                                 ))}
-                                            {sections.filter((s) => s.score < maxScore * 0.7).length === 0 && (
+                                            {sections.filter((s) => s.total > 0 && s.score < s.total * 0.7).length === 0 && (
                                                 <li className="text-gray-500 italic">Excellent performance across all sections!</li>
                                             )}
                                         </ul>
@@ -478,6 +465,12 @@ export default function Scoreboard() {
                                         Download Certificate
                                     </>
                                 )}
+                            </Button>
+                            <Button asChild variant="outline" size="lg" className="border-blue-200 text-blue-700 hover:bg-blue-50">
+                                <Link href="/feedback">
+                                    <BarChart3 className="mr-2 h-4 w-4" />
+                                    View Feedback
+                                </Link>
                             </Button>
                         </div>
                     </div>

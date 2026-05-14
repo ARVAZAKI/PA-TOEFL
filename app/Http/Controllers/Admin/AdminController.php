@@ -110,7 +110,7 @@ class AdminController extends Controller
                             'score' => $progress->score,
                         ];
                     }),
-                    'completedAt' => $session->completed_at->format('Y-m-d H:i'),
+                    'completedAt' => $session->completed_at->format('d M Y, H:i'),
                 ];
             });
 
