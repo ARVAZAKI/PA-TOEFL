@@ -66,9 +66,20 @@ export default function TestQuestion() {
 
     const handleComplete = () => {
         setIsTimerActive(false);
-        const nextRoute = currentPage?.nextId === 'scoreboard' ? '/scoreboard' : currentPage?.nextId ? `/test/${currentPage.nextId}` : '';
+        const nextRoute = currentPage?.id === 'speaking-question'
+            ? '/test/writing-question'
+            : currentPage?.nextId === 'scoreboard'
+                ? '/scoreboard'
+                : currentPage?.nextId
+                    ? `/test/${currentPage.nextId}`
+                    : '';
 
         if (!nextRoute) {
+            return;
+        }
+
+        if (currentPage?.id === 'speaking-question') {
+            router.visit(nextRoute, { replace: true });
             return;
         }
 

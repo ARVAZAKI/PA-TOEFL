@@ -40,6 +40,7 @@ export default function Scoreboard() {
     } = props as unknown as ScoreData;
 
     const [isGenerating, setIsGenerating] = useState(false);
+    const formatScore = (score: number) => Number(score || 0).toFixed(1);
 
     const totalScore = readingScore + listeningScore + speakingScore + writingScore;
     const maxScore = 30;
@@ -155,7 +156,7 @@ export default function Scoreboard() {
             pdf.setFontSize(12);
             pdf.text('TOTAL SCORE', centerX, 96, { align: 'center' });
             pdf.setFontSize(24);
-            pdf.text(`${totalScore}/120`, centerX, 106, { align: 'center' });
+            pdf.text(`${formatScore(totalScore)}/120`, centerX, 106, { align: 'center' });
 
             const scoreCards = [
                 { label: 'Reading', value: `${readingScore}/30`, x: 24, y: 125 },
@@ -293,7 +294,7 @@ export default function Scoreboard() {
                                 </CardDescription>
                             </CardHeader>
                             <CardContent className="text-center">
-                                <div className="mb-2 text-4xl font-bold sm:text-6xl">{totalScore}</div>
+                                <div className="mb-2 text-4xl font-bold sm:text-6xl">{formatScore(totalScore)}</div>
                                 <div className="mb-4 text-xl">out of {maxTotalScore}</div>
                                 <div className={`inline-flex items-center rounded-full border border-white/20 bg-white/20 px-4 py-2`}>
                                     <span className="font-semibold text-white">{overallLevel.level}</span>

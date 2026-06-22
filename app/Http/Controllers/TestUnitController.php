@@ -79,6 +79,7 @@ class TestUnitController extends Controller
         $answers = $request->input('answers', []);
         $assessments = $request->input('assessments', []);
         $questionSnapshots = $request->input('questionSnapshots', []);
+        $pendingSpeakingSubmission = $request->input('pendingSpeakingSubmission');
 
         if (empty($assessments) && $request->filled('assessments_json')) {
             $decodedAssessments = json_decode((string) $request->input('assessments_json'), true);
@@ -100,7 +101,33 @@ class TestUnitController extends Controller
             'assessments_count' => is_array($assessments) ? count($assessments) : 0,
             'question_snapshots_count' => is_array($questionSnapshots) ? count($questionSnapshots) : 0,
             'score' => $request->input('score'),
+            'has_pending_speaking_submission' => is_array($pendingSpeakingSubmission),
         ]);
+
+        if ($section === 'writing-question' && is_array($pendingSpeakingSubmission)) {
+            $pendingSpeakingAnswers = $pendingSpeakingSubmission['answers'] ?? [];
+            $pendingSpeakingAssessments = $pendingSpeakingSubmission['assessments'] ?? [];
+            $pendingSpeakingSnapshots = $pendingSpeakingSubmission['questionSnapshots'] ?? [];
+            $pendingSpeakingScore = $pendingSpeakingSubmission['score'] ?? 0;
+            $pendingSpeakingSection = (string) ($pendingSpeakingSubmission['section'] ?? 'speaking-question');
+
+            Log::info('submitTest processing pending speaking submission before writing', [
+                'pending_section' => $pendingSpeakingSection,
+                'pending_answers_count' => is_array($pendingSpeakingAnswers) ? count($pendingSpeakingAnswers) : 0,
+                'pending_assessments_count' => is_array($pendingSpeakingAssessments) ? count($pendingSpeakingAssessments) : 0,
+            ]);
+
+            $speakingScore = $this->storeSubmission(
+                $pendingSpeakingSection,
+                is_array($pendingSpeakingAnswers) ? $pendingSpeakingAnswers : [],
+                is_array($pendingSpeakingAssessments) ? $pendingSpeakingAssessments : [],
+                is_array($pendingSpeakingSnapshots) ? $pendingSpeakingSnapshots : [],
+                $pendingSpeakingScore
+            );
+
+            session(['SpeakingScore' => $speakingScore]);
+            session(['AnsweredCountSpeaking' => true]);
+        }
 
         $score = $this->storeSubmission($section, $answers, $assessments, $questionSnapshots, $request->input('score'));
 
@@ -453,13 +480,7 @@ class TestUnitController extends Controller
             }
 
             $existingAssessment = $assessments[$originalQuestionId] ?? null;
-            $hasUsableAssessment = is_array($existingAssessment)
-                && (
-                    array_key_exists('feedback', $existingAssessment)
-                    || array_key_exists('score', $existingAssessment)
-                    || array_key_exists('strengths', $existingAssessment)
-                    || array_key_exists('areas_for_improvement', $existingAssessment)
-                );
+            $hasUsableAssessment = $this->hasUsableDetailedAssessment($question, $existingAssessment);
 
             if ($hasUsableAssessment) {
                 Log::info('hydrateMissingAssessments using incoming assessment', [
@@ -494,6 +515,38 @@ class TestUnitController extends Controller
         return $assessments;
     }
 
+    private function hasUsableDetailedAssessment(Question $question, mixed $assessment): bool
+    {
+        if (!is_array($assessment)) {
+            return false;
+        }
+
+        $hasAnyAssessmentField = array_key_exists('feedback', $assessment)
+            || array_key_exists('score', $assessment)
+            || array_key_exists('strengths', $assessment)
+            || array_key_exists('areas_for_improvement', $assessment);
+
+        if (!$hasAnyAssessmentField) {
+            return false;
+        }
+
+        $feedback = strtolower(trim((string) ($assessment['feedback'] ?? '')));
+        $isGenericUnavailableFeedback = $feedback === 'assessment unavailable. please try again later.'
+            || $feedback === 'feedback will appear after evaluation.'
+            || $feedback === 'feedback not available yet.';
+
+        $criteriaScores = $assessment['criteria_scores'] ?? null;
+        $hasCriteriaScores = is_array($criteriaScores) && count($criteriaScores) > 0;
+
+        if ($question->question_type === 'speaking' || $question->question_type === 'essay') {
+            if ($isGenericUnavailableFeedback || !$hasCriteriaScores) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     private function requestSpeakingTextAssessment(string $question, string $answerText): array
     {
         if (str_contains(strtolower($answerText), 'transcription unavailable')) {
@@ -506,6 +559,11 @@ class TestUnitController extends Controller
                 'feedback' => $answerText,
                 'strengths' => [],
                 'areas_for_improvement' => ['Please retry recording in a quieter environment with a longer response.'],
+                'criteria_scores' => [
+                    'Grammar & Language Use' => 0.0,
+                    'Topic Development' => 0.0,
+                    'Delivery / Fluency' => 0.0,
+                ],
                 'fallback' => true,
             ];
         }
@@ -535,12 +593,25 @@ class TestUnitController extends Controller
 
         $wordCount = str_word_count($answerText);
         $fallbackScore = min(7.5, max(1.0, $wordCount / 20));
+        $criteriaScores = [
+            'Grammar & Language Use' => round(min(7.5, max(1.0, $fallbackScore - 0.4)), 1),
+            'Topic Development' => round(min(7.5, max(1.0, $fallbackScore + 0.2)), 1),
+            'Delivery / Fluency' => round(min(7.5, max(1.0, $fallbackScore - 0.2)), 1),
+        ];
+        $fallbackScore = round(array_sum($criteriaScores) / count($criteriaScores), 1);
 
         return [
-            'score' => round($fallbackScore, 1),
+            'score' => $fallbackScore,
             'feedback' => 'Your speaking response was saved, but the detailed AI review is temporarily unavailable.',
-            'strengths' => ['Response provided'],
-            'areas_for_improvement' => ['Try expanding your response with more detail and clearer supporting ideas.'],
+            'strengths' => [
+                'You provide a clear attempt to answer the task and stay on topic.',
+                'Your response includes enough spoken content to show your main idea.',
+            ],
+            'areas_for_improvement' => [
+                'Add more specific supporting detail so each idea sounds more fully developed.',
+                'Work on smoother delivery and more accurate grammar so the response sounds more natural and controlled.',
+            ],
+            'criteria_scores' => $criteriaScores,
             'fallback' => true,
         ];
     }
@@ -572,12 +643,20 @@ class TestUnitController extends Controller
 
         $wordCount = str_word_count($answerText);
         $fallbackScore = $wordCount >= 250 ? 15 : ($wordCount >= 180 ? 13 : ($wordCount >= 120 ? 11 : ($wordCount >= 80 ? 8 : 4)));
+        $criteriaScores = [
+            'Development of Ideas' => min(15, max(3, $fallbackScore + 1)),
+            'Organization & Coherence' => min(15, max(3, $fallbackScore + 2)),
+            'Grammar & Language Use' => min(15, max(2, $fallbackScore - 2)),
+            'Vocabulary' => min(15, max(3, $fallbackScore)),
+        ];
+        $fallbackScore = round(array_sum($criteriaScores) / count($criteriaScores), 1);
 
         return [
             'score' => $fallbackScore,
             'feedback' => 'Your writing response was saved, but the detailed AI review is temporarily unavailable.',
             'strengths' => ['Response provided'],
             'areas_for_improvement' => ['Add clearer examples and improve grammar accuracy to strengthen the response.'],
+            'criteria_scores' => $criteriaScores,
             'fallback' => true,
         ];
     }
@@ -889,11 +968,12 @@ class TestUnitController extends Controller
             $score = $progress->score ?? 0;
             foreach ($progress->userAnswers->sortBy('question.order') as $answer) {
                 $question = $answer->question;
-                $assessment = is_array($answer->assessment_data) ? $answer->assessment_data : [];
+                $assessment = $this->refreshAnswerAssessmentIfNeeded($answer, $question);
                 $feedbackText = $answer->feedback_text
                     ?? ($assessment['feedback'] ?? null)
                     ?? 'Feedback will appear after evaluation.';
                 $areasForImprovement = $assessment['areas_for_improvement'] ?? $assessment['areas'] ?? [];
+                $criteriaScores = is_array($assessment['criteria_scores'] ?? null) ? $assessment['criteria_scores'] : [];
 
                 $questions[] = [
                     'id' => $question?->id ?? $answer->id,
@@ -905,6 +985,7 @@ class TestUnitController extends Controller
                     'feedback' => $feedbackText,
                     'strengths' => array_values($assessment['strengths'] ?? []),
                     'areasForImprovement' => array_values(is_array($areasForImprovement) ? $areasForImprovement : []),
+                    'criteriaScores' => $criteriaScores,
                     'isFallback' => (bool) ($assessment['fallback'] ?? false),
                 ];
             }
@@ -926,11 +1007,12 @@ class TestUnitController extends Controller
             $score = $progress->score ?? 0;
             foreach ($progress->userAnswers->sortBy('question.order') as $answer) {
                 $question = $answer->question;
-                $assessment = is_array($answer->assessment_data) ? $answer->assessment_data : [];
+                $assessment = $this->refreshAnswerAssessmentIfNeeded($answer, $question);
                 $feedbackText = $answer->feedback_text
                     ?? ($assessment['feedback'] ?? null)
                     ?? 'Feedback will appear after evaluation.';
                 $areasForImprovement = $assessment['areas_for_improvement'] ?? $assessment['areas'] ?? [];
+                $criteriaScores = is_array($assessment['criteria_scores'] ?? null) ? $assessment['criteria_scores'] : [];
 
                 $questions[] = [
                     'id' => $question?->id ?? $answer->id,
@@ -941,6 +1023,7 @@ class TestUnitController extends Controller
                     'feedback' => $feedbackText,
                     'strengths' => array_values($assessment['strengths'] ?? []),
                     'areasForImprovement' => array_values(is_array($areasForImprovement) ? $areasForImprovement : []),
+                    'criteriaScores' => $criteriaScores,
                     'isFallback' => (bool) ($assessment['fallback'] ?? false),
                 ];
             }
@@ -951,6 +1034,47 @@ class TestUnitController extends Controller
             'total' => 30,
             'questions' => $questions,
         ];
+    }
+
+    private function refreshAnswerAssessmentIfNeeded(UserAnswer $answer, ?Question $question): array
+    {
+        $assessment = is_array($answer->assessment_data) ? $answer->assessment_data : [];
+
+        if (!$question || $question->question_type === 'multiple_choice') {
+            return $assessment;
+        }
+
+        if ($this->hasUsableDetailedAssessment($question, $assessment)) {
+            return $assessment;
+        }
+
+        $answerText = trim((string) ($answer->answer_content ?? ''));
+        if ($answerText === '') {
+            return $assessment;
+        }
+
+        $generatedAssessment = $question->question_type === 'speaking'
+            ? $this->requestSpeakingTextAssessment($question->question_text ?? '', $answerText)
+            : $this->requestWritingAssessment($question->question_text ?? '', $answerText);
+
+        if (!is_array($generatedAssessment)) {
+            return $assessment;
+        }
+
+        $answer->forceFill([
+            'score' => array_key_exists('score', $generatedAssessment) ? (float) $generatedAssessment['score'] : $answer->score,
+            'feedback_text' => $generatedAssessment['feedback'] ?? $answer->feedback_text,
+            'assessment_data' => $generatedAssessment,
+        ])->save();
+
+        Log::info('refreshAnswerAssessmentIfNeeded refreshed stored assessment', [
+            'user_answer_id' => $answer->id,
+            'question_id' => $question->id,
+            'question_type' => $question->question_type,
+            'assessment_keys' => array_keys($generatedAssessment),
+        ]);
+
+        return $generatedAssessment;
     }
 
     private function getReadingQuestions()

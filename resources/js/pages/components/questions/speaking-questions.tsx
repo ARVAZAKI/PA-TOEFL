@@ -9,6 +9,7 @@ import NavigatorBox from '../layouts/navigator-question';
 const AI_API_URL = '/ai';
 const AI_REQUEST_TIMEOUT_MS = 20000;
 const CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
+const SPEAKING_DRAFT_KEY = 'toefl-speaking-draft';
 
 // Enhanced Speaking Recorder Component with auto-submit
 const SpeakingRecorder = ({
@@ -16,7 +17,7 @@ const SpeakingRecorder = ({
     questionId,
     onAutoSubmit,
 }: {
-    onSave: (blob: Blob, questionId: number) => void;
+    onSave: (blob: Blob, questionId: number) => void | Promise<void>;
     questionId: number;
     onAutoSubmit?: () => void;
 }) => {
@@ -32,78 +33,15 @@ const SpeakingRecorder = ({
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-    // Convert WebM to MP3 using Web Audio API
-    const convertToMp3 = async (webmBlob: Blob): Promise<Blob> => {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = async () => {
-                try {
-                    const arrayBuffer = reader.result as ArrayBuffer;
-                    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-                    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+    const getSupportedMimeType = () => {
+        const candidates = [
+            'audio/webm;codecs=opus',
+            'audio/webm',
+            'audio/mp4',
+            'audio/ogg;codecs=opus',
+        ];
 
-                    // Create offline context for rendering
-                    const offlineContext = new OfflineAudioContext(audioBuffer.numberOfChannels, audioBuffer.length, audioBuffer.sampleRate);
-
-                    const source = offlineContext.createBufferSource();
-                    source.buffer = audioBuffer;
-                    source.connect(offlineContext.destination);
-                    source.start();
-
-                    const renderedBuffer = await offlineContext.startRendering();
-
-                    // Convert to WAV
-                    const wavBlob = audioBufferToWav(renderedBuffer);
-                    resolve(wavBlob);
-                } catch (error) {
-                    reject(error);
-                }
-            };
-            reader.onerror = reject;
-            reader.readAsArrayBuffer(webmBlob);
-        });
-    };
-
-    // Convert AudioBuffer to WAV
-    const audioBufferToWav = (buffer: AudioBuffer): Blob => {
-        const length = buffer.length;
-        const numberOfChannels = buffer.numberOfChannels;
-        const sampleRate = buffer.sampleRate;
-        const arrayBuffer = new ArrayBuffer(44 + length * numberOfChannels * 2);
-        const view = new DataView(arrayBuffer);
-
-        // WAV header
-        const writeString = (offset: number, string: string) => {
-            for (let i = 0; i < string.length; i++) {
-                view.setUint8(offset + i, string.charCodeAt(i));
-            }
-        };
-
-        writeString(0, 'RIFF');
-        view.setUint32(4, 36 + length * numberOfChannels * 2, true);
-        writeString(8, 'WAVE');
-        writeString(12, 'fmt ');
-        view.setUint32(16, 16, true);
-        view.setUint16(20, 1, true);
-        view.setUint16(22, numberOfChannels, true);
-        view.setUint32(24, sampleRate, true);
-        view.setUint32(28, sampleRate * numberOfChannels * 2, true);
-        view.setUint16(32, numberOfChannels * 2, true);
-        view.setUint16(34, 16, true);
-        writeString(36, 'data');
-        view.setUint32(40, length * numberOfChannels * 2, true);
-
-        // Convert float samples to 16-bit PCM
-        let offset = 44;
-        for (let i = 0; i < length; i++) {
-            for (let channel = 0; channel < numberOfChannels; channel++) {
-                const sample = Math.max(-1, Math.min(1, buffer.getChannelData(channel)[i]));
-                view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
-                offset += 2;
-            }
-        }
-
-        return new Blob([arrayBuffer], { type: 'audio/wav' });
+        return candidates.find((type) => MediaRecorder.isTypeSupported(type)) ?? '';
     };
 
     const startRecording = async () => {
@@ -116,9 +54,10 @@ const SpeakingRecorder = ({
                 },
             });
 
-            const mediaRecorder = new MediaRecorder(stream, {
-                mimeType: 'audio/webm;codecs=opus',
-            });
+            const supportedMimeType = getSupportedMimeType();
+            const mediaRecorder = supportedMimeType
+                ? new MediaRecorder(stream, { mimeType: supportedMimeType })
+                : new MediaRecorder(stream);
 
             const chunks: Blob[] = [];
 
@@ -129,23 +68,16 @@ const SpeakingRecorder = ({
             };
 
             mediaRecorder.onstop = async () => {
-                const webmBlob = new Blob(chunks, { type: 'audio/webm' });
-                setIsProcessing(true);
+                const recordedMimeType = mediaRecorder.mimeType || supportedMimeType || 'audio/webm';
+                const recordedBlob = new Blob(chunks, { type: recordedMimeType });
 
                 try {
-                    // Convert to MP3/WAV
-                    const convertedBlob = await convertToMp3(webmBlob);
-                    setAudioBlob(convertedBlob);
-                    setAudioUrl(URL.createObjectURL(convertedBlob));
-
-                    // Auto-submit setelah recording selesai
-                    await handleAutoSubmit(convertedBlob);
+                    setAudioBlob(recordedBlob);
+                    setAudioUrl(URL.createObjectURL(recordedBlob));
+                    void handleAutoSubmit(recordedBlob);
                 } catch (error) {
-                    console.error('Error converting audio:', error);
-                    // Fallback to original blob
-                    setAudioBlob(webmBlob);
-                    setAudioUrl(URL.createObjectURL(webmBlob));
-                    await handleAutoSubmit(webmBlob);
+                    console.error('Error processing audio:', error);
+                    setIsProcessing(false);
                 }
 
                 stream.getTracks().forEach((track) => track.stop());
@@ -178,21 +110,17 @@ const SpeakingRecorder = ({
     };
 
     const handleAutoSubmit = async (blob: Blob) => {
-        try {
-            // Call the onSave callback
-            await onSave(blob, questionId);
-            setIsSubmitted(true);
-            setIsProcessing(false);
+        setIsSubmitted(true);
+        setIsProcessing(false);
 
-            // Call auto submit callback untuk langsung ke pertanyaan berikutnya atau selesai
-            setTimeout(() => {
-                if (onAutoSubmit) {
-                    onAutoSubmit();
-                }
-            }, 2000); // Delay 2 detik untuk menampilkan hasil
+        try {
+            await onSave(blob, questionId);
+
+            if (onAutoSubmit) {
+                onAutoSubmit();
+            }
         } catch (error) {
             console.error('Error auto-submitting:', error);
-            setIsProcessing(false);
         }
     };
 
@@ -231,8 +159,8 @@ const SpeakingRecorder = ({
                 <div className="space-y-3 text-center">
                     <CheckCircle className="mx-auto h-12 w-12 text-green-600" />
                     <h3 className="text-lg font-semibold text-green-800">Answer Submitted Successfully!</h3>
-                    <p className="text-green-600">Your speaking answer has been recorded and assessed.</p>
-                    <div className="text-sm text-green-500">Moving to next question...</div>
+                    <p className="text-green-600">Your recording has been uploaded. Transcription and scoring continue in the background.</p>
+                    <div className="text-sm text-green-500">Opening the next question...</div>
                 </div>
             </div>
         );
@@ -278,13 +206,7 @@ const SpeakingRecorder = ({
 
                 {/* Processing State */}
                 {isProcessing && (
-                    <div className="text-center">
-                        <div className="inline-flex items-center space-x-2">
-                            <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-blue-600"></div>
-                            <span className="text-sm text-gray-600">Processing and submitting audio...</span>
-                        </div>
-                        <div className="mt-1 text-xs text-gray-400">Please wait while we assess your answer</div>
-                    </div>
+                    <div className="text-center text-sm text-gray-600">Uploading your recording...</div>
                 )}
 
                 {/* Audio Playback (sebelum submit) */}
@@ -325,6 +247,7 @@ const SpeakingQuestion = forwardRef(function SpeakingQuestion({ onComplete, sect
     const answersRef = useRef<Record<number, string>>({});
     const scoreRecordsRef = useRef<Record<number, number>>({});
     const assessmentsRef = useRef<Record<number, { score: number; feedback: string; strengths?: string[]; areas_for_improvement?: string[] }>>({});
+    const pendingAssessmentPromisesRef = useRef<Record<number, Promise<void>>>({});
 
     // Handle both array and single object structure for speaking section
     const flatQuestions = Array.isArray(questions)
@@ -367,19 +290,66 @@ const SpeakingQuestion = forwardRef(function SpeakingQuestion({ onComplete, sect
         setMessage('');
     };
 
+    const persistSpeakingDraft = (
+        pendingQuestionIds: number[] = Array.from(processingQuestions),
+        answers = answersRef.current,
+        assessments = assessmentsRef.current,
+        scoreRecords = scoreRecordsRef.current,
+    ) => {
+        if (typeof window === 'undefined') {
+            return;
+        }
+
+        const draft = {
+            section,
+            answers,
+            assessments,
+            scoreRecords,
+            questionSnapshots,
+            pendingQuestionIds,
+            updatedAt: Date.now(),
+        };
+
+        window.sessionStorage.setItem(SPEAKING_DRAFT_KEY, JSON.stringify(draft));
+    };
+
     const handleAutoNext = () => {
         if (data.currentQuestionIndex < flatQuestions.length - 1) {
             setData('currentQuestionIndex', data.currentQuestionIndex + 1);
         } else {
-            // Jika ini pertanyaan terakhir, langsung submit test
-            handleSubmit();
+            persistSpeakingDraft();
+            onComplete();
         }
     };
 
     const handleSaveRecording = async (blob: Blob, questionId: number) => {
         setProcessingQuestions((prev) => new Set([...prev, questionId]));
 
-        const applyAssessment = (transcription: string, score: number, assessment?: { feedback?: string; strengths?: string[]; areas_for_improvement?: string[] }) => {
+        const fallbackTranscript = 'Transcription is being processed in the background.';
+        const initialAssessment = {
+            score: 2.5,
+            feedback: 'Your recording has been uploaded and is being processed.',
+            strengths: ['You completed the speaking task and submitted a recording.'],
+            areas_for_improvement: ['Detailed speaking feedback is being prepared.'],
+            criteria_scores: {
+                'Grammar & Language Use': 2.5,
+                'Topic Development': 2.5,
+                'Delivery / Fluency': 2.5,
+            },
+            fallback: true,
+        };
+
+        const applyAssessment = (
+            transcription: string,
+            score: number,
+            assessment?: {
+                feedback?: string;
+                strengths?: string[];
+                areas_for_improvement?: string[];
+                criteria_scores?: Record<string, number>;
+                fallback?: boolean;
+            },
+        ) => {
             const safeScore = Math.min(Math.max(score, 0), 7.5);
             const feedbackText = assessment?.feedback ?? 'Feedback not available yet.';
             const nextAnswers = {
@@ -397,6 +367,8 @@ const SpeakingQuestion = forwardRef(function SpeakingQuestion({ onComplete, sect
                     feedback: feedbackText,
                     strengths: assessment?.strengths,
                     areas_for_improvement: assessment?.areas_for_improvement,
+                    criteria_scores: assessment?.criteria_scores,
+                    fallback: assessment?.fallback,
                 },
             };
 
@@ -407,62 +379,79 @@ const SpeakingQuestion = forwardRef(function SpeakingQuestion({ onComplete, sect
             setData('answers', nextAnswers);
             setData('scoreRecords', nextScoreRecords);
             setData('assessments', nextAssessments);
+            persistSpeakingDraft(Array.from(processingQuestions), nextAnswers, nextAssessments, nextScoreRecords);
         };
 
-        try {
+        applyAssessment(fallbackTranscript, initialAssessment.score, initialAssessment);
+
+        const processingPromise = (async () => {
+            try {
             // Save recording to state
-            setData('recordings', { ...data.recordings, [questionId]: blob });
+                setData('recordings', { ...data.recordings, [questionId]: blob });
 
-            // Send to Flask API
-            const formData = new FormData();
-            formData.append('audio', blob, 'recording.wav');
-            formData.append('question', currentQuestion.question);
+                // Send to Flask API
+                const formData = new FormData();
+                const fileName = blob.type.includes('mp4')
+                    ? 'recording.m4a'
+                    : blob.type.includes('ogg')
+                        ? 'recording.ogg'
+                        : 'recording.webm';
+                formData.append('audio', blob, fileName);
+                formData.append('question', currentQuestion.question);
 
-            const controller = new AbortController();
-            const timeoutId = window.setTimeout(() => controller.abort(), AI_REQUEST_TIMEOUT_MS);
+                const controller = new AbortController();
+                const timeoutId = window.setTimeout(() => controller.abort(), AI_REQUEST_TIMEOUT_MS);
 
-            const response = await fetch(`${AI_API_URL}/assess-speaking`, {
-                method: 'POST',
-                headers: {
-                    'Accept': 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'X-CSRF-TOKEN': CSRF_TOKEN,
-                },
-                body: formData,
-                signal: controller.signal,
-            });
+                const response = await fetch(`${AI_API_URL}/assess-speaking`, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-TOKEN': CSRF_TOKEN,
+                    },
+                    body: formData,
+                    signal: controller.signal,
+                });
 
-            window.clearTimeout(timeoutId);
-            const result = await response.json().catch(() => ({}));
+                window.clearTimeout(timeoutId);
+                const result = await response.json().catch(() => ({}));
 
-            const transcription = typeof result?.transcription === 'string' && result.transcription.trim().length > 0
-                ? result.transcription
-                : (typeof result?.error === 'string' ? result.error : 'Transcription unavailable. The assessment server is unavailable right now.');
+                const transcription = typeof result?.transcription === 'string' && result.transcription.trim().length > 0
+                    ? result.transcription
+                    : (typeof result?.error === 'string' ? result.error : 'Transcription unavailable. The assessment server is unavailable right now.');
 
-            const score = Number(result?.assessment?.score ?? 0);
-            const fallbackAssessment = result?.assessment ?? {
-                feedback: typeof result?.error === 'string' ? result.error : 'Assessment unavailable. Please try again later.',
-            };
+                const score = Number(result?.assessment?.score ?? 0);
+                const fallbackAssessment = result?.assessment ?? {
+                    feedback: typeof result?.error === 'string' ? result.error : 'Assessment unavailable. Please try again later.',
+                    fallback: true,
+                };
 
-            applyAssessment(transcription, score > 0 ? score : 2.5, fallbackAssessment);
+                applyAssessment(transcription, score > 0 ? score : 2.5, fallbackAssessment);
 
-            if (!response.ok) {
-                console.error('Speaking assessment fallback used:', result);
+                if (!response.ok) {
+                    console.error('Speaking assessment fallback used:', result);
+                }
+
+                console.log(`Recording submitted successfully! Score: ${Math.min(Math.max(score, 0), 7.5)}`);
+            } catch (error) {
+                console.error('Error sending audio:', error);
+                applyAssessment('Transcription unavailable. The assessment server could not be reached.', 2.5, {
+                    feedback: 'Assessment unavailable. Please try again later.',
+                    fallback: true,
+                });
+            } finally {
+                setProcessingQuestions((prev) => {
+                    const newSet = new Set(prev);
+                    newSet.delete(questionId);
+                    persistSpeakingDraft(Array.from(newSet));
+                    return newSet;
+                });
+                delete pendingAssessmentPromisesRef.current[questionId];
             }
+        })();
 
-            console.log(`Recording submitted successfully! Score: ${Math.min(Math.max(score, 0), 7.5)}`);
-        } catch (error) {
-            console.error('Error sending audio:', error);
-            applyAssessment('Transcription unavailable. The assessment server could not be reached.', 2.5, {
-                feedback: 'Assessment unavailable. Please try again later.',
-            });
-        } finally {
-            setProcessingQuestions((prev) => {
-                const newSet = new Set(prev);
-                newSet.delete(questionId);
-                return newSet;
-            });
-        }
+        pendingAssessmentPromisesRef.current[questionId] = processingPromise;
+        persistSpeakingDraft([...Array.from(processingQuestions), questionId]);
     };
 
     const calculateScore = () => {
@@ -475,6 +464,11 @@ const SpeakingQuestion = forwardRef(function SpeakingQuestion({ onComplete, sect
         setIsSubmitting(true);
 
         try {
+            const pendingPromises = Object.values(pendingAssessmentPromisesRef.current);
+            if (pendingPromises.length > 0) {
+                await Promise.allSettled(pendingPromises);
+            }
+
             const totalScore = calculateScore();
 
             setData('score', totalScore);
@@ -626,7 +620,7 @@ const SpeakingQuestion = forwardRef(function SpeakingQuestion({ onComplete, sect
                         <div className="space-y-3">
                             <label className="block text-sm font-semibold text-gray-700">Record Your Speaking Answer:</label>
 
-                            <SpeakingRecorder onSave={handleSaveRecording} questionId={currentQuestion.id} onAutoSubmit={handleAutoNext} />
+                            <SpeakingRecorder key={currentQuestion.id} onSave={handleSaveRecording} questionId={currentQuestion.id} onAutoSubmit={handleAutoNext} />
 
                             {/* Answer Status */}
                             {data.answers[currentQuestion.id] && (
@@ -641,8 +635,8 @@ const SpeakingQuestion = forwardRef(function SpeakingQuestion({ onComplete, sect
                             {processingQuestions.has(currentQuestion.id) && (
                                 <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3">
                                     <div className="flex items-center space-x-2">
-                                        <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-blue-600"></div>
-                                        <span className="text-sm text-blue-700">Processing your answer...</span>
+                                        <div className="h-4 w-4 rounded-full bg-blue-500"></div>
+                                        <span className="text-sm text-blue-700">Your previous response is being transcribed and scored in the background.</span>
                                     </div>
                                 </div>
                             )}

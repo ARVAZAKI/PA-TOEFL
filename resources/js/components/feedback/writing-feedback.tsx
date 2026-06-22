@@ -10,6 +10,7 @@ interface WritingQuestion {
     feedback: string;
     strengths: string[];
     areasForImprovement: string[];
+    criteriaScores: Record<string, number>;
     isFallback: boolean;
 }
 
@@ -86,6 +87,22 @@ export default function WritingFeedback({ data }: Props) {
                                     </div>
                                 </div>
                             </div>
+
+                            {Object.keys(question.criteriaScores).length > 0 && (
+                                <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                                    <p className="text-xs text-slate-800 font-semibold mb-3">Detailed Scores</p>
+                                    <div className="grid gap-3 sm:grid-cols-2">
+                                        {Object.entries(question.criteriaScores).map(([label, value]) => (
+                                            <div key={`${question.id}-${label}`} className="rounded-lg bg-white px-3 py-3 border border-slate-200">
+                                                <p className="text-xs text-slate-500 mb-1">{label}</p>
+                                                <p className="text-base font-semibold text-slate-800">
+                                                    {Number(value).toFixed(1).replace('.0', '')}/15
+                                                </p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
 
                             {question.strengths.length > 0 && (
                                 <div className="bg-green-50 p-4 rounded-lg border border-green-200">

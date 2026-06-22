@@ -46,6 +46,7 @@ interface SpeakingQuestion {
     feedback: string;
     strengths: string[];
     areasForImprovement: string[];
+    criteriaScores: Record<string, number>;
     isFallback: boolean;
 }
 
@@ -58,6 +59,7 @@ interface WritingQuestion {
     feedback: string;
     strengths: string[];
     areasForImprovement: string[];
+    criteriaScores: Record<string, number>;
     isFallback: boolean;
 }
 
@@ -74,6 +76,8 @@ interface FeedbackData {
 interface Props {
     feedback: FeedbackData | null;
 }
+
+const formatOverallScore = (score: number) => Number(score || 0).toFixed(1);
 
 export default function Feedback({ feedback }: Props) {
     if (!feedback) {
@@ -136,7 +140,7 @@ export default function Feedback({ feedback }: Props) {
                                 <CardDescription className="flex items-center gap-2 text-slate-500">
                                     <Sparkles className="h-4 w-4 text-blue-600" /> Overall Score
                                 </CardDescription>
-                                <CardTitle className="text-5xl font-black text-blue-600">{feedback.overallScore}</CardTitle>
+                                <CardTitle className="text-5xl font-black text-blue-600">{formatOverallScore(feedback.overallScore)}</CardTitle>
                             </CardHeader>
                             <CardContent>
                                 <p className="text-sm text-slate-600">Your overall performance on this test</p>
